@@ -1,0 +1,3 @@
+[submodule "lib/dss"]
+	path = lib/dss
+	url = https://github.com/makerdao/dss
