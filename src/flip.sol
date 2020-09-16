@@ -17,7 +17,7 @@
 
 pragma solidity >=0.5.12;
 
-import "./lib.sol";
+import "dss/lib.sol";
 
 interface VatLike {
     function move(address,address,uint256) external;
@@ -25,8 +25,17 @@ interface VatLike {
 }
 
 interface RedeemLike {
-    function redeemOrder(uint, uint) public;
+    function redeemOrder(uint) external;
+    function disburse() external returns (uint,uint);
+}
 
+interface GemLike {
+    function transferFrom(address,address,uint) external returns (bool);
+}
+
+interface GemJoinLike {
+    function join(address,uint) external;
+    function exit(address,uint) external;
 }
 
 contract TinlakeFlipper is LibNote {
@@ -47,7 +56,7 @@ contract TinlakeFlipper is LibNote {
     GemLike           public dai;
     GemLike           public drop;
     GemJoinLike       public daiJoin;
-    DROPJoinLike      public dropJoin;
+    GemJoinLike       public dropJoin;
 
     uint    public tab;
     address public vow;
@@ -71,31 +80,32 @@ contract TinlakeFlipper is LibNote {
     }
 
     // --- Math ---
-    function sub(uint48 x, uint48 y) internal pure returns (uint48 z) {
+    function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
         require((z = x - y) <= x);
     }
 
     // --- Auction ---
-    function kick(address dest_, address gal, uint256 tab, uint256 lot, uint256 bid)
+    function kick(address dest_, address gal, uint256 tab_, uint256 lot, uint256 bid)
         public auth returns (uint256 id)
     {
         vow = gal;
         dest = dest_;
+        tab = tab_;
         vat.flux(ilk, msg.sender, address(this), lot);
 
         dropJoin.exit(address(this), lot);
         pool.redeemOrder(lot);
-        emit Kick(id, lot, bid, tab, dest, vow);
+        emit Kick(id, lot, bid, tab_, dest, vow);
     }
 
     function take() public {
-        uint returned, _ = pool.disburse();
+        (uint returned, ) = pool.disburse();
         if (tab < returned) {
-            dai.transferFrom(address(this), usr, sub(returned-tab));
+            dai.transferFrom(address(this), dest, sub(returned, tab));
             returned = tab;
         }
         if (tab != 0) {
-            dai.join(vow, returned);
+            daiJoin.join(vow, returned);
             tab = sub(tab, returned);
         }
     }

@@ -18,7 +18,8 @@
 
 pragma solidity >=0.5.12;
 
-import "./lib.sol";
+import {GemJoin} from "dss/join.sol";
+import "dss/lib.sol";
 
 interface GemLike {
     function decimals() external view returns (uint);
