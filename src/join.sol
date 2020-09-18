@@ -33,6 +33,16 @@ interface VatLike {
 }
 
 contract TinlakeJoin is GemJoin {
+    constructor(address vat_, bytes32 ilk_, address gem_) public GemJoin(vat_, ilk_, gem_) {
+      wards[msg.sender] = 1;
+    }
+
+    function exit(address usr, uint wad) external note {
+        require(wad <= 2 ** 255, "GemJoin/overflow");
+        vat.slip(ilk, msg.sender, -int(wad));
+        require(gem.transfer(usr, wad), "GemJoin/failed-transfer");
+    }
+
     function join(address usr, uint wad) external auth note {
         require(live == 1, "GemJoin/not-live");
         require(int(wad) >= 0, "GemJoin/overflow");

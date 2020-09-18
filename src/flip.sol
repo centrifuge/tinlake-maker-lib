@@ -31,12 +31,16 @@ interface RedeemLike {
 
 interface GemLike {
     function transferFrom(address,address,uint) external returns (bool);
+    function transfer(address,uint) external returns (bool);
+    function approve(address,uint) external;
+    function balanceOf(address) external view returns (uint);
 }
 
 interface GemJoinLike {
     function join(address,uint) external;
     function exit(address,uint) external;
 }
+
 
 contract TinlakeFlipper is LibNote {
     // --- Auth ---
@@ -73,15 +77,37 @@ contract TinlakeFlipper is LibNote {
     );
 
     // --- Init ---
-    constructor(address vat_, bytes32 ilk_) public {
+    constructor(address vat_, bytes32 ilk_, address drop_, address dai_, address dropJoin_, address daiJoin_, address pool_, address tranche) public {
         vat = VatLike(vat_);
         ilk = ilk_;
+
+        drop = GemLike(address(drop_));
+        dai = GemLike(dai_);
+
+        dropJoin = GemJoinLike(dropJoin_);
+        daiJoin = GemJoinLike(daiJoin_);
+
+        pool = RedeemLike(pool_);
+
+        dai.approve(daiJoin_, uint(-1));
+        drop.approve(dropJoin_, uint(-1));
+        drop.approve(tranche, uint(-1));
         wards[msg.sender] = 1;
     }
 
+    function file(bytes32 what, address data) public auth {
+        if (what == "dai") {
+        }
+    }
+
     // --- Math ---
+    uint constant RAY = 10 ** 27;
     function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
         require((z = x - y) <= x);
+    }
+
+    function mul(uint x, uint y) public pure returns (uint z) {
+        require(y == 0 || (z = x * y) / y == x);
     }
 
     // --- Auction ---
@@ -92,21 +118,21 @@ contract TinlakeFlipper is LibNote {
         dest = dest_;
         tab = tab_;
         vat.flux(ilk, msg.sender, address(this), lot);
-
         dropJoin.exit(address(this), lot);
-        pool.redeemOrder(lot);
+        pool.redeemOrder(drop.balanceOf(address(this)));
         emit Kick(id, lot, bid, tab_, dest, vow);
     }
 
     function take() public {
         (uint returned, ) = pool.disburse();
-        if (tab < returned) {
-            dai.transferFrom(address(this), dest, sub(returned, tab));
-            returned = tab;
+        uint tabWad = tab / RAY; // always rounds down, this could lead to < 1 RAY to be lost in dust
+        if (tabWad < returned) {
+            dai.transfer(dest, sub(returned, tabWad));
+            returned = tabWad;
         }
         if (tab != 0) {
             daiJoin.join(vow, returned);
-            tab = sub(tab, returned);
+            tab = sub(tab, mul(returned, RAY));
         }
     }
 }
