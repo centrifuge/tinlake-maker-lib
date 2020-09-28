@@ -46,19 +46,19 @@ interface RedeemLike {
 
 // This contract is (or will become) essentially a merge of
 // flip, join and a cdp-manager.
-// It manages only one cdp. It can not recover from a liquidation
-// and needs to be redeployed after it has gone into an unsafe or
-// unhealthy state.
+// It manages only one cdp and only has one owner. It can not recover
+// from a liquidatio and needs to be redeployed after it has gone
+// into an unsafe or unhealthy state.
 
-// It manages only one cdp, and can enter two stages of liquidation:
+// It manages only one urn, and can enter two stages of liquidation:
 // 1) A 'soft' liquidation (tell + unwind), in which drop is send to the pool
-// to redeem dai to reduce cdp debt.
+// to redeem DROP for DAI to reduce cdp debt.
 
 // 2) A 'hard' liquidation (kick + recover), triggered by a `cat.bite`, in which
 // dai redeemed goes to cover vow sin.
 
 // Note that the internal gem created as a result of `join` through this manager is
-// not pure drop, but rather `drop` in this contract + what's currently
+// not only DROP as an ERC20 balance in this contract, but also what's currently
 // undergoing redemption from the Tinlake pool.
 
 contract TinlakeMgr {
@@ -75,6 +75,8 @@ contract TinlakeMgr {
     GemJoinLike public daiJoin;
 
     constructor(address vat_, bytes32 ilk_, address gem_, address pool_, address owner_) public {
+        wards[msg.sender] = 1;
+
         pool = RedeemLike(pool_);
         owner = owner_;
 
@@ -105,6 +107,7 @@ contract TinlakeMgr {
     // --- Vault Operation---
     // join & exit move the gem directly into/from the urn
     function exit(address usr, uint wad) external ownerOnly note {
+        require(safe && healthy && live);
         require(wad <= 2 ** 255, "TinlakeManager/overflow");
         gem = sub(gem, wad);
         vat.slip(ilk, owner, -int(wad));
@@ -113,7 +116,7 @@ contract TinlakeMgr {
     }
 
     function join(address usr, uint wad) public ownerOnly note {
-        require(live == 1, "TinlakeManager/not-live");
+        require(safe && healthy && live);
         require(int(wad) >= 0, "TinlakeManager/overflow");
         gem = add(gem, wad);
         vat.slip(ilk, usr, int(wad));
@@ -138,17 +141,13 @@ contract TinlakeMgr {
 
 
     // --- Soft Liquidations ---
-    function seize() public auth note {
+    function tell() public auth note {
         safe = false;
-    }
-
-    function unwind() public note {
-        require(healthy && !safe, "TinlakeManager/not-soft-liquidation")
         debt = gem.balanceOf(address(this);
         pool.redeemOrder(debt);
     }
 
-    function recover(uint endEpoch) public note {
+    function unwind(uint endEpoch) public note {
         require(healthy && !safe, "TinlakeManager/not-soft-liquidation")
         // (payoutCurrencyAmount, payoutTokenAmount, remainingSupplyCurrency, remainingRedeemToken);
         (uint daiReturned, _, _, uint remainingDrop) = pool.disburse();
@@ -182,14 +181,15 @@ contract TinlakeMgr {
         vow = gal;
         tab = tab_;
         // We move the gem into this adapter mostly for cosmetic reasons.
-        // There is no use for it anymore in the system.
+        // There is no use for it anymore in the system. It would be
+        // cleaner to reduce it in `take` using `vat.slip()`
         vat.flux(ilk, msg.sender, address(this), lot);
         dropJoin.exit(address(this), lot);
         pool.redeemOrder(drop.balanceOf(address(this)));
         emit Kick(id, lot, bid, tab_, dest, vow);
     }
 
-    function take() public {
+    function recover() public {
         require(!healthy, "TinlakeManager/Pool-healhty");
         (uint returned, _, _, uint dropRemaining) = pool.disburse();
 
