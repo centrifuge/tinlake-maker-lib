@@ -46,18 +46,22 @@ interface RedeemLike {
 
 // This contract is (or will become) essentially a merge of
 // flip, join and a cdp-manager.
-// It manages only one cdp.
+// It manages only one cdp. It can not recover from a liquidation
+// and needs to be redeployed after it has gone into an unsafe or
+// unhealthy state.
 
 // It manages only one cdp, and can enter two stages of liquidation:
-// 1) A 'soft' liquidation (unwind + recover), in which drop is send to the pool
+// 1) A 'soft' liquidation (tell + unwind), in which drop is send to the pool
 // to redeem dai to reduce cdp debt.
 
 // 2) A 'hard' liquidation (kick + recover), triggered by a `cat.bite`, in which
 // dai redeemed goes to cover vow sin.
 
 // Note that the internal gem created as a result of `join` through this manager is
-// not pure drop, but rather `drop` in this contract + what's currently undergoing soft liquidiation.
-contract TinlakeMgr{
+// not pure drop, but rather `drop` in this contract + what's currently
+// undergoing redemption from the Tinlake pool.
+
+contract TinlakeMgr {
     bool public safe; // In normal operation
     bool public healthy; // In normal operation
     bool public live; // In normal operation
@@ -70,9 +74,9 @@ contract TinlakeMgr{
     GemLike     public drop;
     GemJoinLike public daiJoin;
 
-    constructor(address vat_, bytes32 ilk_, address gem_, address pool_, address user_) public {
+    constructor(address vat_, bytes32 ilk_, address gem_, address pool_, address owner_) public {
         pool = RedeemLike(pool_);
-        user = user_;
+        owner = owner_;
 
         safe = true;
         healthy = true;
@@ -95,31 +99,41 @@ contract TinlakeMgr{
         require(y == 0 || (z = x * y) / y == x);
     }
 
-    // --- Only allow certain interactions from the user ---
-    modifier userOnly() { require(msg.sender == user, "TinlakeMgr/user-only"); _; }
+    // --- Only allow certain interactions from the owner ---
+    modifier ownerOnly() { require(msg.sender == owner, "TinlakeMgr/owner-only"); _; }
 
     // --- Vault Operation---
-    function exit(address usr, uint wad) external userOnly note {
+    // join & exit move the gem directly into/from the urn
+    function exit(address usr, uint wad) external ownerOnly note {
         require(wad <= 2 ** 255, "TinlakeManager/overflow");
         gem = sub(gem, wad);
-        vat.slip(ilk, user, -int(wad));
+        vat.slip(ilk, owner, -int(wad));
+        vat.frob(ilk, address(this), address(this), -int(wad), 0);
         require(gem.transfer(usr, share), "TinlakeManager/failed-transfer");
     }
 
-    function join(address usr, uint wad) public userOnly note {
+    function join(address usr, uint wad) public ownerOnly note {
         require(live == 1, "TinlakeManager/not-live");
         require(int(wad) >= 0, "TinlakeManager/overflow");
         gem = add(gem, wad);
         vat.slip(ilk, usr, int(wad));
-        require(gem.transferFrom(user, address(this), wad), "GemJoin/failed-transfer");
+        vat.frob(ilk, address(this), address(this), int(wad), 0);
+        require(gem.transferFrom(owner, address(this), wad), "GemJoin/failed-transfer");
     }
 
-    function draw() userOnly {
+    // draw & wipe call daiJoin.exit/join immediately
+    function draw(uint wad) ownerOnly {
         require(safe && healthy && live);
-
+        vat.frob(ilk, address(this), address(this), 0, wad);
+        daiJoin.exit(owner, wad);
     }
-    function wipe() {
+
+    function wipe(uint wad) {
         require(safe && healthy && live);
+        require(wad <= 2 ** 255, "TinlakeManager/overflow");
+
+        daiJoin.join(address(this), wad);
+        vat.frob(ilk, address(this), address(this), 0, -int(wad));
     }
 
 
@@ -134,11 +148,14 @@ contract TinlakeMgr{
         pool.redeemOrder(debt);
     }
 
-    function recover() public note {
+    function recover(uint endEpoch) public note {
         require(healthy && !safe, "TinlakeManager/not-soft-liquidation")
-        (uint daiReturned, uint dropReturned ) = pool.disburse();
-        debt = sub(debt, dropReturned);
+        // (payoutCurrencyAmount, payoutTokenAmount, remainingSupplyCurrency, remainingRedeemToken);
+        (uint daiReturned, _, _, uint remainingDrop) = pool.disburse();
+        dropReturned = -int(sub(debt, remainingDrop));
+        debt = remainingDrop;
 
+        // Calculate DAI debt
         (uint art, ) = vat.urns(ilk, urn);
         ( , uint rate, , ,) = vat.ilks(ilk);
         uint dtab = mul(art, rate);
@@ -146,11 +163,13 @@ contract TinlakeMgr{
 
         daiJoin.join(address(this), payback);
 
-        if (art > 0) {
-            vat.frob(ilk, urn, address(this), address(this), address(this), 0, -int(mul(payBack, ONE)));
-        }
-        dai.transfer(dai.balanceOf(address(this)), user);
-
+        // if (art > 0) { should always call it
+        vat.frob(ilk, urn, address(this), address(this), address(this),
+                 dropReturned, -int(mul(payBack, ONE)));
+        // }
+        vat.slip(ilk, address(this), dropReturned);
+        dai.transfer(dai.balanceOf(address(this)), owner);
+    }
 
     // --- Writeoff ---
     // called by the Cat, creates `sin` in the `vow` and attempts
@@ -162,6 +181,8 @@ contract TinlakeMgr{
         healthy = false;
         vow = gal;
         tab = tab_;
+        // We move the gem into this adapter mostly for cosmetic reasons.
+        // There is no use for it anymore in the system.
         vat.flux(ilk, msg.sender, address(this), lot);
         dropJoin.exit(address(this), lot);
         pool.redeemOrder(drop.balanceOf(address(this)));
@@ -170,10 +191,11 @@ contract TinlakeMgr{
 
     function take() public {
         require(!healthy, "TinlakeManager/Pool-healhty");
-        (uint returned, ) = pool.disburse();
+        (uint returned, _, _, uint dropRemaining) = pool.disburse();
+
         uint tabWad = tab / RAY; // always rounds down, this could lead to < 1 RAY to be lost in dust
         if (tabWad < returned) {
-            dai.transfer(user, sub(returned, tabWad));
+            dai.transfer(owner, sub(returned, tabWad));
             returned = tabWad;
         }
         if (tab != 0) {
