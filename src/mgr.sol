@@ -26,6 +26,8 @@ interface GemLike {
     function decimals() external view returns (uint);
     function transfer(address,uint) external returns (bool);
     function transferFrom(address,address,uint) external returns (bool);
+    function approve(address,uint) external returns (bool);
+    function balanceOf(address) external returns (uint);
 }
 
 interface GemJoinLike {
@@ -35,13 +37,16 @@ interface GemJoinLike {
 
 interface VatLike {
     function slip(bytes32,address,int) external;
-    function urns(bytes32,bytes32) external returns (uint,uint);
+    function flux(bytes32,address,address,uint256) external;
+    function ilks(bytes32) external returns (uint,uint,uint,uint,uint);
+    function urns(bytes32,address) external returns (uint,uint);
     function move(address,address,uint) external;
+    function frob(bytes32,address,address,address,int,int) external;
 }
 
 interface RedeemLike {
     function redeemOrder(uint) external;
-    function disburse() external returns (uint,uint);
+    function disburse(uint) external returns (uint,uint,uint,uint);
 }
 
 // This contract is (or will become) essentially a merge of
@@ -50,47 +55,83 @@ interface RedeemLike {
 // from a liquidatio and needs to be redeployed after it has gone
 // into an unsafe or unhealthy state.
 
-// It manages only one urn, and can enter two stages of liquidation:
-// 1) A 'soft' liquidation (tell + unwind), in which drop is send to the pool
-// to redeem DROP for DAI to reduce cdp debt.
+// It manages only one urn, which can be liquidated in two stages:
+// 1) In the first stage, set safe = false and call
+// pool.disburse() to try to recover as much dai as possible.
 
-// 2) A 'hard' liquidation (kick + recover), triggered by a `cat.bite`, in which
-// dai redeemed goes to cover vow sin.
+// 2) After the first liquidation period has completed, we either managed to redeem
+// enough dai to wipe off all cdp debt, or this debt needs to be written off
+// and addded to the sin.
 
 // Note that the internal gem created as a result of `join` through this manager is
 // not only DROP as an ERC20 balance in this contract, but also what's currently
 // undergoing redemption from the Tinlake pool.
 
-contract TinlakeMgr {
-    bool public safe; // In normal operation
-    bool public healthy; // In normal operation
-    bool public live; // In normal operation
+contract TinlakeMgr is LibNote {
+    // --- Auth ---
+    mapping (address => uint) public wards;
+    function rely(address usr) external note auth { require(live, "mgr/not-live"); wards[usr] = 1; }
+    function deny(address usr) external note auth { require(live, "mgr/not-live"); wards[usr] = 0; }
+    modifier auth {
+        require(wards[msg.sender] == 1, "mgr/not-authorized");
+        _;
+    }
 
-    uint public gem; // DROP in Maker
+    // The owner manages the cdp, and is not authorized to call tell, kick or cage.
+    address public owner;
+
+    bool public safe; // Liquidation not triggered
+    bool public glad; // Write-off not triggered
+    bool public live; // Global settlement not triggered
+
+    uint public debt; // DROP outstanding (in pool redemption)
     uint public tab;  // DAI owed to vow
+    bytes32 public ilk;
 
+    // These can all be hardcoded
+    VatLike public vat;
     address public vow;
-    RedeemLike  public pool; // TODO: make constant
-    GemLike     public drop;
+    GemLike public dai;
+    RedeemLike  public pool;
+    GemLike     public gem;
     GemJoinLike public daiJoin;
 
-    constructor(address vat_, bytes32 ilk_, address gem_, address pool_, address owner_) public {
+    // --- Events ---
+    event Kick(
+      uint256 id,
+      uint256 lot,
+      uint256 bid,
+      uint256 tab,
+      address indexed usr,
+      address indexed gal
+    );
+    
+    constructor(address vat_,  address dai_,  address vow_,
+                address pool_, address drop_, address daiJoin_,
+                bytes32 ilk_,  address owner_) public {
+
+        vat = VatLike(vat_);
+        vow = vow_;
+        dai = GemLike(dai_);
+        gem = GemLike(drop_);
+        daiJoin = GemJoinLike(daiJoin_);
+
+        ilk = ilk_;
         wards[msg.sender] = 1;
 
         pool = RedeemLike(pool_);
         owner = owner_;
 
         safe = true;
-        healthy = true;
+        glad = true;
         live = true;
 
-        drop = GemLike(drop_);
-        daiJoin = GemJoinLike(daiJoin_);
         dai.approve(daiJoin_, uint(-1));
-        drop.approve(pool_, uint(-1));
+        gem.approve(pool_, uint(-1));
     }
 
     // --- Math ---
+    uint constant ONE = 10 ** 27;
     function add(uint x, uint y) internal pure returns (uint z) {
         require((z = x + y) >= x);
     }
@@ -100,74 +141,80 @@ contract TinlakeMgr {
     function mul(uint x, uint y) internal pure returns (uint z) {
         require(y == 0 || (z = x * y) / y == x);
     }
+    function divup(uint x, uint y) internal pure returns (uint z) {
+        z = add(x, sub(y, 1)) / y;
+    }
+    function max(uint x, uint y) internal pure returns (uint z) {
+        z = x > y ? x : y;
+    }
 
     // --- Only allow certain interactions from the owner ---
     modifier ownerOnly() { require(msg.sender == owner, "TinlakeMgr/owner-only"); _; }
 
     // --- Vault Operation---
     // join & exit move the gem directly into/from the urn
-    function exit(address usr, uint wad) external ownerOnly note {
-        require(safe && healthy && live);
-        require(wad <= 2 ** 255, "TinlakeManager/overflow");
-        gem = sub(gem, wad);
-        vat.slip(ilk, owner, -int(wad));
-        vat.frob(ilk, address(this), address(this), -int(wad), 0);
-        require(gem.transfer(usr, share), "TinlakeManager/failed-transfer");
+    function join(address usr, uint wad) public ownerOnly note {
+        require(safe && glad && live);
+        require(int(wad) >= 0, "TinlakeManager/overflow");
+        gem.transferFrom(owner, address(this), wad);
+        vat.slip(ilk, usr, int(wad));
+        vat.frob(ilk, address(this), address(this), address(this), int(wad), 0);
     }
 
-    function join(address usr, uint wad) public ownerOnly note {
-        require(safe && healthy && live);
+    function exit(address usr, uint wad) external ownerOnly note {
+        require(safe && glad && live);
         require(int(wad) >= 0, "TinlakeManager/overflow");
-        gem = add(gem, wad);
-        vat.slip(ilk, usr, int(wad));
-        vat.frob(ilk, address(this), address(this), int(wad), 0);
-        require(gem.transferFrom(owner, address(this), wad), "GemJoin/failed-transfer");
+        vat.slip(ilk, owner, -int(wad));
+        vat.frob(ilk, address(this), address(this), address(this), -int(wad), 0);
+        gem.transfer(usr, wad);
     }
 
     // draw & wipe call daiJoin.exit/join immediately
-    function draw(uint wad) ownerOnly {
-        require(safe && healthy && live);
-        vat.frob(ilk, address(this), address(this), 0, wad);
+    function draw(uint wad) public ownerOnly note {
+        require(safe && glad && live);
+        require(int(wad) >= 0, "TinlakeManager/overflow");
+        vat.frob(ilk, address(this), address(this), address(this), 0, int(wad));
         daiJoin.exit(owner, wad);
     }
 
-    function wipe(uint wad) {
-        require(safe && healthy && live);
-        require(wad <= 2 ** 255, "TinlakeManager/overflow");
+    function wipe(uint wad) public ownerOnly note {
+        require(safe && glad && live);
+        require(int(wad) >= 0, "TinlakeManager/overflow");
 
         daiJoin.join(address(this), wad);
-        vat.frob(ilk, address(this), address(this), 0, -int(wad));
+        vat.frob(ilk, address(this), address(this), address(this), 0, -int(wad));
     }
 
 
-    // --- Soft Liquidations ---
+    // --- Liquidation ---
     function tell() public auth note {
+        require(safe && glad && live);
         safe = false;
-        debt = gem.balanceOf(address(this);
-        pool.redeemOrder(debt);
+        debt = add(debt, gem.balanceOf(address(this)));
+        pool.redeemOrder(gem.balanceOf(address(this)));
     }
 
     function unwind(uint endEpoch) public note {
-        require(healthy && !safe, "TinlakeManager/not-soft-liquidation")
-        // (payoutCurrencyAmount, payoutTokenAmount, remainingSupplyCurrency, remainingRedeemToken);
-        (uint daiReturned, _, _, uint remainingDrop) = pool.disburse();
-        dropReturned = -int(sub(debt, remainingDrop));
-        debt = remainingDrop;
+        require(glad && !safe && live, "TinlakeManager/not-soft-liquidation");
+        (, , ,uint remainingDrop) = pool.disburse(endEpoch);
+        uint dropReturned = sub(debt, remainingDrop);
+        debt = remainingDrop; // assert(debt == gem.balanceOf(address(this))
 
-        // Calculate DAI debt
-        (uint art, ) = vat.urns(ilk, urn);
+        // Calculate DAI cdp debt
+        (uint art, ) = vat.urns(ilk, address(this));
         ( , uint rate, , ,) = vat.ilks(ilk);
-        uint dtab = mul(art, rate);
-        uint payBack = max(returned, divup(dtab, ONE));
+        uint daitab = mul(art, rate);
 
-        daiJoin.join(address(this), payback);
+        uint payBack = max(dai.balanceOf(address(this)), divup(daitab, ONE));
 
-        // if (art > 0) { should always call it
-        vat.frob(ilk, urn, address(this), address(this), address(this),
-                 dropReturned, -int(mul(payBack, ONE)));
-        // }
-        vat.slip(ilk, address(this), dropReturned);
-        dai.transfer(dai.balanceOf(address(this)), owner);
+        daiJoin.join(address(this), payBack);
+
+        // Repay dai debt up to the full amount
+        vat.frob(ilk, address(this), address(this), address(this),
+                 -int(dropReturned), -int(payBack));
+
+        // Return possible remainder to the owner
+        dai.transfer(owner, dai.balanceOf(address(this)));
     }
 
     // --- Writeoff ---
@@ -177,31 +224,32 @@ contract TinlakeMgr {
     function kick(address dest_, address gal, uint256 tab_, uint256 lot, uint256 bid)
         public auth returns (uint256 id)
     {
-        healthy = false;
+        require(live && !safe && glad);
+        glad = false;
         vow = gal;
         tab = tab_;
         // We move the gem into this adapter mostly for cosmetic reasons.
         // There is no use for it anymore in the system. It would be
         // cleaner to reduce it in `take` using `vat.slip()`
         vat.flux(ilk, msg.sender, address(this), lot);
-        dropJoin.exit(address(this), lot);
-        pool.redeemOrder(drop.balanceOf(address(this)));
-        emit Kick(id, lot, bid, tab_, dest, vow);
+        pool.redeemOrder(gem.balanceOf(address(this)));
+        emit Kick(id, lot, bid, tab_, dest_, vow);
     }
 
-    function recover() public {
-        require(!healthy, "TinlakeManager/Pool-healhty");
-        (uint returned, _, _, uint dropRemaining) = pool.disburse();
+    function recover(uint endEpoch) public {
+        require(!safe && !glad && live, "TinlakeManager/Pool-healhty");
+        (uint returned, , ,) = pool.disburse(endEpoch);
 
-        uint tabWad = tab / RAY; // always rounds down, this could lead to < 1 RAY to be lost in dust
+        uint tabWad = tab / ONE; // always rounds down, this could lead to < 1 RAY to be lost in dust
         if (tabWad < returned) {
             dai.transfer(owner, sub(returned, tabWad));
             returned = tabWad;
         }
         if (tab != 0) {
             daiJoin.join(vow, returned);
-            tab = sub(tab, mul(returned, RAY));
+            tab = sub(tab, mul(returned, ONE));
         }
+
     }
 
 
@@ -209,6 +257,4 @@ contract TinlakeMgr {
     function cage() external note auth {
         live = false;
     }
-
-
 }
