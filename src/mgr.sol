@@ -252,6 +252,19 @@ contract TinlakeMgr is LibNote {
 
     }
 
+    // needs to be added to support end
+    
+    /* function bids(uint id) external view returns ( */
+    /*     uint256 bid,   // [rad] */
+    /*     uint256 lot,   // [wad] */
+    /*     address guy, */
+    /*     uint48  tic,   // [unix epoch time] */
+    /*     uint48  end,   // [unix epoch time] */
+    /*     address usr, */
+    /*     address gal, */
+    /*     uint256 tab    // [rad] */
+    /* ); */
+    /* function yank(uint id) external; */
 
     // --- End ---
     function cage() external note auth {
