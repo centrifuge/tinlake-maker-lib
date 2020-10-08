@@ -1,7 +1,6 @@
-/// tinlake_join.sol -- Tinlake specific GemJoin
+/// tinlake_manager.sol -- Tinlake dss adapter
 
-// Copyright (C) 2018 Rain <rainbreak@riseup.net>,
-// 2019 Lucas Vogelsang <lucas@centrifuge.io>,
+// 2020 Lucas Vogelsang <lucas@centrifuge.io>,
 // 2020 Martin Lundfall <martin.lundfall@gmail.com>
 //
 // This program is free software: you can redistribute it and/or modify
@@ -72,7 +71,7 @@ interface AssessorLike {
 // not only DROP as an ERC20 balance in this contract, but also what's currently
 // undergoing redemption from the Tinlake pool.
 
-contract TinlakeMgr is LibNote {
+contract TinlakeManager is LibNote {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address usr) external note auth { require(live, "mgr/not-live"); wards[usr] = 1; }
@@ -262,7 +261,7 @@ contract TinlakeMgr is LibNote {
         emit Kick(id, lot, bid, tab_, dest_, vow);
     }
 
-    function recover(uint endEpoch) public {
+    function recover(uint endEpoch) public note {
         require(!safe && !glad && live, "TinlakeManager/Pool-healhty");
         (uint returned, , ,uint remainingDrop) = pool.disburse(endEpoch);
         uint dropReturned = sub(debt, remainingDrop);
