@@ -185,10 +185,14 @@ contract TinlakeMgr is LibNote {
         vat.frob(ilk, address(this), address(this), address(this), 0, -int(wad));
     }
 
+    function tellCondition() internal returns (bool) {
+        return false;
+    }
 
     // --- Liquidation ---
-    function tell() public auth note {
+    function tell() public note {
         require(safe && glad && live);
+        require(tellCondition() || wards[msg.sender] == 1);
         safe = false;
         debt = add(debt, gem.balanceOf(address(this)));
         pool.redeemOrder(gem.balanceOf(address(this)));
@@ -252,6 +256,19 @@ contract TinlakeMgr is LibNote {
 
     }
 
+    // needs to be added to support end
+    
+    /* function bids(uint id) external view returns ( */
+    /*     uint256 bid,   // [rad] */
+    /*     uint256 lot,   // [wad] */
+    /*     address guy, */
+    /*     uint48  tic,   // [unix epoch time] */
+    /*     uint48  end,   // [unix epoch time] */
+    /*     address usr, */
+    /*     address gal, */
+    /*     uint256 tab    // [rad] */
+    /* ); */
+    /* function yank(uint id) external; */
 
     // --- End ---
     function cage() external note auth {
