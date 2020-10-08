@@ -36,10 +36,6 @@ interface GemJoinLike {
     function exit(address,uint) external;
 }
 
-interface PipLike {
-    function peek() external returns (bytes32, bool);
-}
-
 interface VatLike {
     function slip(bytes32,address,int) external;
     function flux(bytes32,address,address,uint256) external;
@@ -52,6 +48,10 @@ interface VatLike {
 interface RedeemLike {
     function redeemOrder(uint) external;
     function disburse(uint) external returns (uint,uint,uint,uint);
+}
+
+interface AssessorLike {
+    function calcTokenPrices() external returns (uint, uint);
 }
 
 // This contract is (or will become) essentially a merge of
@@ -105,13 +105,10 @@ contract TinlakeMgr is LibNote {
     GemJoinLike public daiJoin;
 
     // Tinlake components
-    GemLike     public drop;
-    GemLike     public tin;
-    RedeemLike  public pool;
-
-    // Tranches price feeds
-    PipLike public junior;
-    PipLike public senior;
+    GemLike      public drop;
+    GemLike      public tin;
+    RedeemLike   public pool;
+    AssessorLike public assessor;
 
     // --- Events ---
     event Kick(
@@ -124,7 +121,7 @@ contract TinlakeMgr is LibNote {
     );
 
     constructor(address vat_,  address dai_,  address vow_, address daiJoin_,
-                address pool_, address drop_, address junior_, address senior_,
+                address pool_, address drop_, address assessor_,
                 bytes32 ilk_,  address owner_) public {
 
         vat = VatLike(vat_);
@@ -134,9 +131,7 @@ contract TinlakeMgr is LibNote {
 
         drop = GemLike(drop_);
         pool = RedeemLike(pool_);
-
-        junior = PipLike(junior_);
-        senior = PipLike(senior_);
+        assessor = AssessorLike(assessor_);
 
         ilk = ilk_;
         wards[msg.sender] = 1;
@@ -211,13 +206,12 @@ contract TinlakeMgr is LibNote {
 
     // --- Soft liquidiation condition ---
     function tellCondition() internal returns (bool) {
-        (bytes32 juniorPrice, bool hasJunior) = junior.peek();
-        (bytes32 seniorPrice, bool hasSenior) = senior.peek();
+        (uint juniorPrice, uint seniorPrice) = assessor.calcTokenPrices();
 
-        uint seniorValue = mul(uint(seniorPrice), drop.totalSupply());
-        // TODO: increase precision?
-        return !hasJunior || !hasSenior || seniorValue / add(seniorValue, mul(uint(juniorPrice), tin.totalSupply())) > limit;
+        uint seniorValue = mul(seniorPrice, drop.totalSupply());
 
+        // TODO: precision?
+        return seniorValue / add(seniorValue, mul(juniorPrice, tin.totalSupply())) > limit;
     }
 
     // --- Liquidation ---
@@ -225,22 +219,23 @@ contract TinlakeMgr is LibNote {
         require(safe && glad && live);
         require(tellCondition() || wards[msg.sender] == 1);
         safe = false;
-        debt = add(debt, drop.balanceOf(address(this)));
-        pool.redeemOrder(drop.balanceOf(address(this)));
+        uint balance = drop.balanceOf(address(this));
+        debt = balance;
+        pool.redeemOrder(balance);
     }
 
     function unwind(uint endEpoch) public note {
         require(glad && !safe && live, "TinlakeManager/not-soft-liquidation");
-        (, , ,uint remainingDrop) = pool.disburse(endEpoch);
+        (uint redeemed, , ,uint remainingDrop) = pool.disburse(endEpoch);
         uint dropReturned = sub(debt, remainingDrop);
-        debt = remainingDrop; // assert(debt == gem.balanceOf(address(this))
+        debt = remainingDrop;
 
         // Calculate DAI cdp debt
         (uint art, ) = vat.urns(ilk, address(this));
         ( , uint rate, , ,) = vat.ilks(ilk);
         uint daitab = mul(art, rate);
 
-        uint payBack = max(dai.balanceOf(address(this)), divup(daitab, ONE));
+        uint payBack = max(redeemed, divup(daitab, ONE));
 
         daiJoin.join(address(this), payBack);
 
@@ -260,19 +255,21 @@ contract TinlakeMgr is LibNote {
     {
         require(live && !safe && glad);
         glad = false;
-        vow = gal;
         tab = tab_;
-        // We move the drop into this adapter mostly for cosmetic reasons.
-        // There is no use for it anymore in the system. It would be
-        // cleaner to reduce it in `take` using `vat.slip()`
+        // We move the drop into this adapter mostly for accounting reasons.
+        // It will gradually be destroyed by calls to `recover`.
         vat.flux(ilk, msg.sender, address(this), lot);
-        pool.redeemOrder(drop.balanceOf(address(this)));
         emit Kick(id, lot, bid, tab_, dest_, vow);
     }
 
     function recover(uint endEpoch) public {
         require(!safe && !glad && live, "TinlakeManager/Pool-healhty");
-        (uint returned, , ,) = pool.disburse(endEpoch);
+        (uint returned, , ,uint remainingDrop) = pool.disburse(endEpoch);
+        uint dropReturned = sub(debt, remainingDrop);
+        debt = remainingDrop;
+        // ensure the slip will succeed despite hostile airdrops.
+        uint unslip = min(vat.gem(ilk, address(this)), dropReturned);
+        vat.slip(ilk, address(this), -int(unslip));
 
         uint tabWad = tab / ONE; // always rounds down, this could lead to < 1 RAY to be lost in dust
         if (tabWad < returned) {
