@@ -42,6 +42,7 @@ interface VatLike {
     function urns(bytes32,address) external returns (uint,uint);
     function move(address,address,uint) external;
     function frob(bytes32,address,address,address,int,int) external;
+    function gem(bytes32,address) external returns (uint);
 }
 
 interface RedeemLike {
@@ -161,6 +162,9 @@ contract TinlakeManager is LibNote {
     }
     function max(uint x, uint y) internal pure returns (uint z) {
         z = x > y ? x : y;
+    }
+    function min(uint x, uint y) internal pure returns (uint z) {
+        z = x > y ? y : x;
     }
 
     // --- Vault Operation---
