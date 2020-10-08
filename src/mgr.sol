@@ -43,6 +43,7 @@ interface VatLike {
     function move(address,address,uint) external;
     function frob(bytes32,address,address,address,int,int) external;
     function gem(bytes32,address) external returns (uint);
+    function hope(address) external;
 }
 
 interface RedeemLike {
@@ -81,8 +82,10 @@ contract TinlakeManager is LibNote {
         require(wards[msg.sender] == 1, "mgr/not-authorized");
         _;
     }
-    // --- Only allow certain interactions from the owner ---
-    modifier ownerOnly() { require(msg.sender == owner, "TinlakeMgr/owner-only"); _; }
+    modifier ownerOnly {
+        require(msg.sender == owner, "TinlakeMgr/owner-only");
+        _;
+    }
 
     // The owner manages the cdp, but is not authorized to call kick or cage.
     address public owner;
@@ -143,6 +146,7 @@ contract TinlakeManager is LibNote {
         live = true;
 
         dai.approve(daiJoin_, uint(-1));
+        vat.hope(daiJoin_);
         drop.approve(pool_, uint(-1));
     }
 
@@ -173,7 +177,7 @@ contract TinlakeManager is LibNote {
     function join(uint wad) public ownerOnly note {
         require(safe && glad && live);
         require(int(wad) >= 0, "TinlakeManager/overflow");
-        drop.transferFrom(owner, address(this), wad);
+        drop.transferFrom(msg.sender, address(this), wad);
         vat.slip(ilk, address(this), int(wad));
         vat.frob(ilk, address(this), address(this), address(this), int(wad), 0);
     }
@@ -182,7 +186,7 @@ contract TinlakeManager is LibNote {
         require(safe && glad && live);
         require(int(wad) >= 0, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this), -int(wad), 0);
-        vat.slip(ilk, owner, -int(wad));
+        vat.slip(ilk, address(this), -int(wad));
         drop.transfer(usr, wad);
     }
 
@@ -191,14 +195,14 @@ contract TinlakeManager is LibNote {
         require(safe && glad && live);
         require(int(wad) >= 0, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this), 0, int(wad));
-        daiJoin.exit(owner, wad);
+        daiJoin.exit(msg.sender, wad);
     }
 
     function wipe(uint wad) public ownerOnly note {
         require(safe && glad && live);
         require(int(wad) >= 0, "TinlakeManager/overflow");
-
-        daiJoin.join(address(this), wad);
+        dai.transferFrom(owner, address(this), wad);
+        daiJoin.join(msg.sender, wad);
         vat.frob(ilk, address(this), address(this), address(this), 0, -int(wad));
     }
 
