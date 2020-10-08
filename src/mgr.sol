@@ -124,8 +124,8 @@ contract TinlakeManager is LibNote {
     );
 
     constructor(address vat_,  address dai_,  address vow_, address daiJoin_,
-                address pool_, address drop_, address assessor_,
-                bytes32 ilk_,  address owner_) public {
+                address pool_, address drop_, address tin_, address assessor_,
+                bytes32 ilk_,  address owner_, address tranche) public {
 
         vat = VatLike(vat_);
         vow = vow_;
@@ -133,6 +133,7 @@ contract TinlakeManager is LibNote {
         daiJoin = GemJoinLike(daiJoin_);
 
         drop = GemLike(drop_);
+        tin = GemLike(tin_);
         pool = RedeemLike(pool_);
         assessor = AssessorLike(assessor_);
 
@@ -148,6 +149,7 @@ contract TinlakeManager is LibNote {
         dai.approve(daiJoin_, uint(-1));
         vat.hope(daiJoin_);
         drop.approve(pool_, uint(-1));
+        drop.approve(tranche, uint(-1));
     }
 
     // --- Math ---
@@ -238,11 +240,11 @@ contract TinlakeManager is LibNote {
         debt = remainingDrop;
 
         // Calculate DAI cdp debt
-        (uint art, ) = vat.urns(ilk, address(this));
+        (, uint art) = vat.urns(ilk, address(this));
         ( , uint rate, , ,) = vat.ilks(ilk);
         uint daitab = mul(art, rate);
 
-        uint payBack = max(redeemed, divup(daitab, ONE));
+        uint payBack = min(redeemed, divup(daitab, ONE));
 
         daiJoin.join(address(this), payBack);
 
