@@ -27,12 +27,17 @@ interface GemLike {
     function transfer(address,uint) external returns (bool);
     function transferFrom(address,address,uint) external returns (bool);
     function approve(address,uint) external returns (bool);
+    function totalSupply() external returns (uint);
     function balanceOf(address) external returns (uint);
 }
 
 interface GemJoinLike {
     function join(address,uint) external;
     function exit(address,uint) external;
+}
+
+interface PipLike {
+    function peek() external returns (bytes32, bool);
 }
 
 interface VatLike {
@@ -76,25 +81,37 @@ contract TinlakeMgr is LibNote {
         require(wards[msg.sender] == 1, "mgr/not-authorized");
         _;
     }
+    // --- Only allow certain interactions from the owner ---
+    modifier ownerOnly() { require(msg.sender == owner, "TinlakeMgr/owner-only"); _; }
 
-    // The owner manages the cdp, and is not authorized to call tell, kick or cage.
+    // The owner manages the cdp, but is not authorized to call kick or cage.
     address public owner;
 
     bool public safe; // Liquidation not triggered
     bool public glad; // Write-off not triggered
     bool public live; // Global settlement not triggered
 
+    uint public limit; // soft liquidiation parameter
     uint public debt; // DROP outstanding (in pool redemption)
     uint public tab;  // DAI owed to vow
-    bytes32 public ilk;
+    bytes32 public ilk; // Constant (TODO: hardcode)
 
-    // These can all be hardcoded
+    // --- Contracts ---
+    // These can (should) all be hardcoded upon release.
+    // dss components
     VatLike public vat;
     address public vow;
     GemLike public dai;
-    RedeemLike  public pool;
-    GemLike     public gem;
     GemJoinLike public daiJoin;
+
+    // Tinlake components
+    GemLike     public drop;
+    GemLike     public tin;
+    RedeemLike  public pool;
+
+    // Tranches price feeds
+    PipLike public junior;
+    PipLike public senior;
 
     // --- Events ---
     event Kick(
@@ -105,21 +122,25 @@ contract TinlakeMgr is LibNote {
       address indexed usr,
       address indexed gal
     );
-    
-    constructor(address vat_,  address dai_,  address vow_,
-                address pool_, address drop_, address daiJoin_,
+
+    constructor(address vat_,  address dai_,  address vow_, address daiJoin_,
+                address pool_, address drop_, address junior_, address senior_,
                 bytes32 ilk_,  address owner_) public {
 
         vat = VatLike(vat_);
         vow = vow_;
         dai = GemLike(dai_);
-        gem = GemLike(drop_);
         daiJoin = GemJoinLike(daiJoin_);
+
+        drop = GemLike(drop_);
+        pool = RedeemLike(pool_);
+
+        junior = PipLike(junior_);
+        senior = PipLike(senior_);
 
         ilk = ilk_;
         wards[msg.sender] = 1;
 
-        pool = RedeemLike(pool_);
         owner = owner_;
 
         safe = true;
@@ -127,7 +148,7 @@ contract TinlakeMgr is LibNote {
         live = true;
 
         dai.approve(daiJoin_, uint(-1));
-        gem.approve(pool_, uint(-1));
+        drop.approve(pool_, uint(-1));
     }
 
     // --- Math ---
@@ -148,25 +169,23 @@ contract TinlakeMgr is LibNote {
         z = x > y ? x : y;
     }
 
-    // --- Only allow certain interactions from the owner ---
-    modifier ownerOnly() { require(msg.sender == owner, "TinlakeMgr/owner-only"); _; }
-
     // --- Vault Operation---
     // join & exit move the gem directly into/from the urn
-    function join(address usr, uint wad) public ownerOnly note {
+    // TODO: unify these?
+    function join(uint wad) public ownerOnly note {
         require(safe && glad && live);
         require(int(wad) >= 0, "TinlakeManager/overflow");
-        gem.transferFrom(owner, address(this), wad);
-        vat.slip(ilk, usr, int(wad));
+        drop.transferFrom(owner, address(this), wad);
+        vat.slip(ilk, address(this), int(wad));
         vat.frob(ilk, address(this), address(this), address(this), int(wad), 0);
     }
 
     function exit(address usr, uint wad) external ownerOnly note {
         require(safe && glad && live);
         require(int(wad) >= 0, "TinlakeManager/overflow");
-        vat.slip(ilk, owner, -int(wad));
         vat.frob(ilk, address(this), address(this), address(this), -int(wad), 0);
-        gem.transfer(usr, wad);
+        vat.slip(ilk, owner, -int(wad));
+        drop.transfer(usr, wad);
     }
 
     // draw & wipe call daiJoin.exit/join immediately
@@ -185,8 +204,20 @@ contract TinlakeMgr is LibNote {
         vat.frob(ilk, address(this), address(this), address(this), 0, -int(wad));
     }
 
+    // --- Administration
+    function file(uint data) external note auth {
+        limit = data;
+    }
+
+    // --- Soft liquidiation condition ---
     function tellCondition() internal returns (bool) {
-        return false;
+        (bytes32 juniorPrice, bool hasJunior) = junior.peek();
+        (bytes32 seniorPrice, bool hasSenior) = senior.peek();
+
+        uint seniorValue = mul(uint(seniorPrice), drop.totalSupply());
+        // TODO: increase precision?
+        return !hasJunior || !hasSenior || seniorValue / add(seniorValue, mul(uint(juniorPrice), tin.totalSupply())) > limit;
+
     }
 
     // --- Liquidation ---
@@ -194,8 +225,8 @@ contract TinlakeMgr is LibNote {
         require(safe && glad && live);
         require(tellCondition() || wards[msg.sender] == 1);
         safe = false;
-        debt = add(debt, gem.balanceOf(address(this)));
-        pool.redeemOrder(gem.balanceOf(address(this)));
+        debt = add(debt, drop.balanceOf(address(this)));
+        pool.redeemOrder(drop.balanceOf(address(this)));
     }
 
     function unwind(uint endEpoch) public note {
@@ -224,7 +255,6 @@ contract TinlakeMgr is LibNote {
     // --- Writeoff ---
     // called by the Cat, creates `sin` in the `vow` and attempts
     // to recover from the pool over time.
-    //
     function kick(address dest_, address gal, uint256 tab_, uint256 lot, uint256 bid)
         public auth returns (uint256 id)
     {
@@ -232,11 +262,11 @@ contract TinlakeMgr is LibNote {
         glad = false;
         vow = gal;
         tab = tab_;
-        // We move the gem into this adapter mostly for cosmetic reasons.
+        // We move the drop into this adapter mostly for cosmetic reasons.
         // There is no use for it anymore in the system. It would be
         // cleaner to reduce it in `take` using `vat.slip()`
         vat.flux(ilk, msg.sender, address(this), lot);
-        pool.redeemOrder(gem.balanceOf(address(this)));
+        pool.redeemOrder(drop.balanceOf(address(this)));
         emit Kick(id, lot, bid, tab_, dest_, vow);
     }
 
@@ -253,22 +283,7 @@ contract TinlakeMgr is LibNote {
             daiJoin.join(vow, returned);
             tab = sub(tab, mul(returned, ONE));
         }
-
     }
-
-    // needs to be added to support end
-    
-    /* function bids(uint id) external view returns ( */
-    /*     uint256 bid,   // [rad] */
-    /*     uint256 lot,   // [wad] */
-    /*     address guy, */
-    /*     uint48  tic,   // [unix epoch time] */
-    /*     uint48  end,   // [unix epoch time] */
-    /*     address usr, */
-    /*     address gal, */
-    /*     uint256 tab    // [rad] */
-    /* ); */
-    /* function yank(uint id) external; */
 
     // --- End ---
     function cage() external note auth {
