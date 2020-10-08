@@ -18,6 +18,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
+      - name: Checkout submodules
+        run: git submodule update --init --recursive
       - uses: cachix/install-nix-action@63cf434de4e4292c6960639d56c5dd550e789d77
         with:
           skip_adding_nixpkgs_channel: false
@@ -27,4 +29,4 @@ jobs:
           skipPush: true
           signingKey: ''
       - name: test
-        run: nix-shell --pure --command "dapp --use solc:0.5.12 test"
+        run: nix-shell --pure --command "make test"
