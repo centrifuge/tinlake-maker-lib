@@ -15,7 +15,7 @@
 
 pragma solidity >=0.5.12;
 
-import "./lib.sol";
+import "dss/lib.sol";
 
 interface VatLike {
     function file(bytes32, bytes32, uint) external;
