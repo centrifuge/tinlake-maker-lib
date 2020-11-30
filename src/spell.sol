@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Martin Lundfall
+// Copyright (C) 2020 Maker Ecosystem Growth Holdings, INC.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,64 +13,47 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity 0.5.12;
+pragma solidity >=0.5.12;
 
 import "lib/dss-interfaces/src/dapp/DSPauseAbstract.sol";
-import "lib/dss-interfaces/src/dss/VatAbstract.sol";
 import "lib/dss-interfaces/src/dss/CatAbstract.sol";
+import "lib/dss-interfaces/src/dss/FlipAbstract.sol";
+import "lib/dss-interfaces/src/dss/FlipperMomAbstract.sol";
+import "lib/dss-interfaces/src/dss/IlkRegistryAbstract.sol";
+import "lib/dss-interfaces/src/dss/GemJoinAbstract.sol";
 import "lib/dss-interfaces/src/dss/JugAbstract.sol";
-import "lib/dss-interfaces/src/dss/SpotAbstract.sol";
+import "lib/dss-interfaces/src/dss/MedianAbstract.sol";
 import "lib/dss-interfaces/src/dss/OsmAbstract.sol";
 import "lib/dss-interfaces/src/dss/OsmMomAbstract.sol";
-import "lib/dss-interfaces/src/dss/MedianAbstract.sol";
-import "lib/dss-interfaces/src/dss/PotAbstract.sol";
-import "lib/dss-interfaces/src/dss/FlipperMomAbstract.sol";
+import "lib/dss-interfaces/src/dss/SpotAbstract.sol";
+import "lib/dss-interfaces/src/dss/VatAbstract.sol";
+//import "lib/dss-interfaces/src/dss/ChainlogAbstract.sol";
 
-interface MgrAbstract {
-    function rely(address) external;
-    function drop() external returns (address);
-    function vat() external returns (address);
-    function vow() external returns (address);
-    function assessor() external returns (address);
-    function daiJoin() external returns (address);
-    function dai() external returns (address);
-    function ilk() external returns (bytes32);
+interface ChainlogAbstract {
+    function getAddress(bytes32) external returns (address);
 }
 
-
-
 contract SpellAction {
-    // KOVAN ADDRESSES
+    // MAINNET ADDRESSES
     //
     // The contracts in this list should correspond to MCD core contracts, verify
     //  against the current release list at:
-    //     https://changelog.makerdao.com/releases/kovan/1.0.8/contracts.json
+    //     https://changelog.makerdao.com/releases/mainnet/1.1.4/contracts.json
+    ChainlogAbstract constant CHANGELOG = ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
 
-    address constant public MCD_VAT             = 0xbA987bDB501d131f766fEe8180Da5d81b34b69d9;
-    address constant public MCD_CAT             = 0x0511674A67192FE51e86fE55Ed660eB4f995BDd6;
-    address constant public MCD_VOW             = 0x0F4Cbe6CBA918b7488C26E29d9ECd7368F38EA3b;
-    address constant public MCD_JUG             = 0xcbB7718c9F39d05aEEDE1c472ca8Bf804b2f1EaD;
-    address constant public MCD_POT             = 0xEA190DBDC7adF265260ec4dA6e9675Fd4f5A78bb;
-    address constant public MCD_DAI_JOIN        =	0x5AA71a3ae1C0bd6ac27A1f28e1415fFFB6F15B8c;
-    address constant public MCD_DAI	            = 0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa;
+    address constant FLIP_FAB        = 0x4ACdbe9dd0d00b36eC2050E805012b8Fc9974f2b;
 
-    address constant public MCD_SPOT            = 0x3a042de6413eDB15F2784f2f97cC68C7E9750b2D;
-    address constant public MCD_END             = 0x24728AcF2E2C403F5d2db4Df6834B8998e56aA5F;
-    address constant public FLIPPER_MOM         = 0xf3828caDb05E5F22844f6f9314D99516D68a0C84;
-    address constant public OSM_MOM             = 0x5dA9D1C3d4f1197E5c52Ff963916Fe84D2F5d8f3;
+    address constant DROP            = 0xE4C72b4dE5b0F9ACcEA880Ad0b1F944F85A9dAA0;
+    address constant MCD_DROP_MGR_A  = 0xe29A14bcDeA40d83675aa43B72dF07f649738C8b;
+    address constant MCD_FLIP_GUSD_A = 0xCAa8D152A8b98229fB77A213BE16b234cA4f612f;
+    address constant PIP_GUSD        = 0xf45Ae69CcA1b9B043dAE2C83A5B65Bc605BEc5F5;
 
-    // DROP specific addresses
-    // DROP token address 0xTBD
-    address constant public MCD_DROP_MGR_A      = address(0xacab);
-    address constant public PIP_DROP            = address(0xbabe);
-    address constant public DROP                = address(0xcafe);
-
-    // decimals & precision
-    uint256 constant public THOUSAND            = 10 ** 3;
-    uint256 constant public MILLION             = 10 ** 6;
-    uint256 constant public WAD                 = 10 ** 18;
-    uint256 constant public RAY                 = 10 ** 27;
-    uint256 constant public RAD                 = 10 ** 45;
+    // Decimals & precision
+    uint256 constant THOUSAND = 10 ** 3;
+    uint256 constant MILLION  = 10 ** 6;
+    uint256 constant WAD      = 10 ** 18;
+    uint256 constant RAY      = 10 ** 27;
+    uint256 constant RAD      = 10 ** 45;
 
     // Many of the settings that change weekly rely on the rate accumulator
     // described at https://docs.makerdao.com/smart-contract-modules/rates-module
@@ -78,77 +61,123 @@ contract SpellAction {
     //
     // $ bc -l <<< 'scale=27; e( l(1.08)/(60 * 60 * 24 * 365) )'
     //
-    uint256 constant public TWELVE_PCT_RATE        = 1000000003593629043335673582;
+    // A table of rates can be found at
+    //    https://ipfs.io/ipfs/QmefQMseb3AiTapiAKKexdKHig8wroKuZbmLtPLv4u2YwW
+    uint256 constant FOUR_PERCENT_RATE = 1000000001243680656318820312;
 
     function execute() external {
-        // Set the global debt ceiling to
-        VatAbstract(MCD_VAT).file("Line", VatAbstract(MCD_VAT).Line() + 1 * MILLION * RAD);
+        address MCD_VAT      = CHANGELOG.getAddress("MCD_VAT");
+        address MCD_CAT      = CHANGELOG.getAddress("MCD_CAT");
+        address MCD_JUG      = CHANGELOG.getAddress("MCD_JUG");
+        address MCD_SPOT     = CHANGELOG.getAddress("MCD_SPOT");
+        address MCD_END      = CHANGELOG.getAddress("MCD_END");
+        address FLIPPER_MOM  = CHANGELOG.getAddress("FLIPPER_MOM");
+        //address OSM_MOM      = CHANGELOG.getAddress("OSM_MOM");
+        address ILK_REGISTRY = CHANGELOG.getAddress("ILK_REGISTRY");
 
-        // Set ilk bytes32 variable
-        bytes32 DROP_A_ILK = "DROP-A";
+        // Add DROP contracts to the changelog
+        CHANGELOG.setAddress("DROP", DROP);
+        CHANGELOG.setAddress("MCD_DROP_MGR_A", MCD_DROP_MGR_A);
+        CHANGELOG.setAddress("MCD_FLIP_DROP_A", MCD_FLIP_DROP_A);
+        CHANGELOG.setAddress("PIP_GUSD", PIP_GUSD);
 
-        // Sanity checks
-        require(MgrAbstract(MCD_DROP_MGR_A).vat() == MCD_VAT, "mgr-vat-not-match");
-        require(MgrAbstract(MCD_DROP_MGR_A).ilk() == DROP_A_ILK, "mgr-ilk-not-match");
-        require(MgrAbstract(MCD_DROP_MGR_A).drop() == DROP, "mgr-drop-not-match");
-        require(MgrAbstract(MCD_DROP_MGR_A).vow() == MCD_VOW, "mgr-vow-not-match");
-        require(MgrAbstract(MCD_DROP_MGR_A).dai() == MCD_DAI, "mgr-dai-not-match");
-        require(MgrAbstract(MCD_DROP_MGR_A).daiJoin() == MCD_DAI_JOIN, "mgr-daiJoin-not-match");
+        //        CHANGELOG.setVersion("1.1.5");
 
-        // Set price feed for DROP-A
-        SpotAbstract(MCD_SPOT).file(DROP_A_ILK, "pip", PIP_DROP);
+        /* bytes32 ilk = "GUSD-A"; */
 
-        // Set the DROP-A flipper in the cat
-        CatAbstract(MCD_CAT).file(DROP_A_ILK, "flip", MCD_DROP_MGR_A);
+        /* // Sanity checks */
+        /* require(GemJoinAbstract(MCD_JOIN_GUSD_A).vat() == MCD_VAT, "join-vat-not-match"); */
+        /* require(GemJoinAbstract(MCD_JOIN_GUSD_A).ilk() == ilk, "join-ilk-not-match"); */
+        /* require(GemJoinAbstract(MCD_JOIN_GUSD_A).gem() == GUSD, "join-gem-not-match"); */
+        /* require(GemJoinAbstract(MCD_JOIN_GUSD_A).dec() == 2, "join-dec-not-match"); */
+        /* require(FlipAbstract(MCD_FLIP_GUSD_A).vat() == MCD_VAT, "flip-vat-not-match"); */
+        /* require(FlipAbstract(MCD_FLIP_GUSD_A).cat() == MCD_CAT, "flip-cat-not-match"); */
+        /* require(FlipAbstract(MCD_FLIP_GUSD_A).ilk() == ilk, "flip-ilk-not-match"); */
 
-        // Init DROP-A in Vat & Jug
-        VatAbstract(MCD_VAT).init(DROP_A_ILK);
-        JugAbstract(MCD_JUG).init(DROP_A_ILK);
+        /* // Set the GUSD PIP in the Spotter */
+        /* SpotAbstract(MCD_SPOT).file(ilk, "pip", PIP_GUSD); */
 
-        // Allow DROP-A manager to modify Vat registry
-        VatAbstract(MCD_VAT).rely(MCD_DROP_MGR_A);
+        /* // Set the GUSD-A Flipper in the Cat */
+        /* CatAbstract(MCD_CAT).file(ilk, "flip", MCD_FLIP_GUSD_A); */
 
-        // Allow cat to kick auctions in DROP-A Manager
-        // NOTE: this will be reverse later in spell, and is done only for explicitness.
-        MgrAbstract(MCD_DROP_MGR_A).rely(MCD_CAT);
+        /* // Init GUSD-A ilk in Vat & Jug */
+        /* VatAbstract(MCD_VAT).init(ilk); */
+        /* JugAbstract(MCD_JUG).init(ilk); */
 
-        // There is nothing to yank from the manager in end.
+        /* // Allow GUSD-A Join to modify Vat registry */
+        /* VatAbstract(MCD_VAT).rely(MCD_JOIN_GUSD_A); */
+        /* // Allow the GUSD-A Flipper to reduce the Cat litterbox on deal() */
+        /* CatAbstract(MCD_CAT).rely(MCD_FLIP_GUSD_A); */
+        /* // Allow Cat to kick auctions in GUSD-A Flipper */
+        /* FlipAbstract(MCD_FLIP_GUSD_A).rely(MCD_CAT); */
+        /* // Allow End to yank auctions in GUSD-A Flipper */
+        /* FlipAbstract(MCD_FLIP_GUSD_A).rely(MCD_END); */
+        /* // Allow FlipperMom to access to the GUSD-A Flipper */
+        /* FlipAbstract(MCD_FLIP_GUSD_A).rely(FLIPPER_MOM); */
+        /* // Disallow Cat to kick auctions in GUSD-A Flipper */
+        /* // !!!!!!!! Only for certain collaterals that do not trigger liquidations like USDC-A) */
+        /* FlipperMomAbstract(FLIPPER_MOM).deny(MCD_FLIP_GUSD_A); */
 
-        // Allow FlipperMom to access the DROP-A manager
-        MgrAbstract(MCD_DROP_MGR_A).rely(FLIPPER_MOM);
+        /* // Allow OsmMom to access to the GUSD Osm */
+        /* // !!!!!!!! Only if PIP_GUSD = Osm and hasn't been already relied due a previous deployed ilk */
+        /* //OsmAbstract(PIP_GUSD).rely(OSM_MOM); */
+        /* // Whitelist Osm to read the Median data (only necessary if it is the first time the token is being added to an ilk) */
+        /* // !!!!!!!! Only if PIP_GUSD = Osm, its src is a Median and hasn't been already whitelisted due a previous deployed ilk */
+        /* //MedianAbstract(OsmAbstract(PIP_GUSD).src()).kiss(PIP_GUSD); */
+        /* // Whitelist Spotter to read the Osm data (only necessary if it is the first time the token is being added to an ilk) */
+        /* // !!!!!!!! Only if PIP_GUSD = Osm or PIP_GUSD = Median and hasn't been already whitelisted due a previous deployed ilk */
+        /* //OsmAbstract(PIP_GUSD).kiss(MCD_SPOT); */
+        /* // Whitelist End to read the Osm data (only necessary if it is the first time the token is being added to an ilk) */
+        /* // !!!!!!!! Only if PIP_GUSD = Osm or PIP_GUSD = Median and hasn't been already whitelisted due a previous deployed ilk */
+        /* //OsmAbstract(PIP_GUSD).kiss(MCD_END); */
+        /* // Set GUSD Osm in the OsmMom for new ilk */
+        /* // !!!!!!!! Only if PIP_GUSD = Osm */
+        /* //OsmMomAbstract(OSM_MOM).setOsm(ilk, PIP_GUSD); */
 
-        // Update OSM
-        MedianAbstract(OsmAbstract(PIP_DROP).src()).kiss(PIP_DROP);
-        OsmAbstract(PIP_DROP).rely(OSM_MOM);
-        OsmAbstract(PIP_DROP).kiss(MCD_SPOT);
-        OsmAbstract(PIP_DROP).kiss(MCD_END);
-        OsmMomAbstract(OSM_MOM).setOsm(DROP_A_ILK, PIP_DROP);
+        /* // Set the global debt ceiling */
+        /* VatAbstract(MCD_VAT).file("Line", 1_468_750_000 * RAD); */
+        /* // Set the GUSD-A debt ceiling */
+        /* VatAbstract(MCD_VAT).file(ilk, "line", 5 * MILLION * RAD); */
+        /* // Set the GUSD-A dust */
+        /* VatAbstract(MCD_VAT).file(ilk, "dust", 100 * RAD); */
+        /* // Set the Lot size */
+        /* CatAbstract(MCD_CAT).file(ilk, "dunk", 50 * THOUSAND * RAD); */
+        /* // Set the GUSD-A liquidation penalty (e.g. 13% => X = 113) */
+        /* CatAbstract(MCD_CAT).file(ilk, "chop", 113 * WAD / 100); */
+        /* // Set the GUSD-A stability fee (e.g. 1% = 1000000000315522921573372069) */
+        /* JugAbstract(MCD_JUG).file(ilk, "duty", FOUR_PERCENT_RATE); */
+        /* // Set the GUSD-A percentage between bids (e.g. 3% => X = 103) */
+        /* FlipAbstract(MCD_FLIP_GUSD_A).file("beg", 103 * WAD / 100); */
+        /* // Set the GUSD-A time max time between bids */
+        /* FlipAbstract(MCD_FLIP_GUSD_A).file("ttl", 6 hours); */
+        /* // Set the GUSD-A max auction duration to */
+        /* FlipAbstract(MCD_FLIP_GUSD_A).file("tau", 6 hours); */
+        /* // Set the GUSD-A min collateralization ratio (e.g. 150% => X = 150) */
+        /* SpotAbstract(MCD_SPOT).file(ilk, "mat", 101 * RAY / 100); */
 
-        VatAbstract(MCD_VAT).file(DROP_A_ILK,   "line"  , 1 * MILLION * RAD    ); // 1 MM debt ceiling
-        VatAbstract(MCD_VAT).file(DROP_A_ILK,   "dust"  , 20 * RAD             ); // 20 Dai dust
-        CatAbstract(MCD_CAT).file(DROP_A_ILK,   "lump"  , uint(-1)             ); // Maximum lot size
-        CatAbstract(MCD_CAT).file(DROP_A_ILK,   "chop"  , 113 * RAY / 100      ); // 13% liq. penalty
-        JugAbstract(MCD_JUG).file(DROP_A_ILK,   "duty"  , TWELVE_PCT_RATE      ); // 12% stability fee
-        SpotAbstract(MCD_SPOT).file(DROP_A_ILK, "mat"   , 101 * RAY / 100      ); // 101% coll. ratio
-        SpotAbstract(MCD_SPOT).poke(DROP_A_ILK);
+        /* // Update GUSD-A spot value in Vat */
+        /* SpotAbstract(MCD_SPOT).poke(ilk); */
 
-        // Execute the first poke in the Osm for the next value
-        OsmAbstract(PIP_DROP).poke();
-
-        // Update DROP-A spot value in Vat
-        SpotAbstract(MCD_SPOT).poke(DROP_A_ILK);
+        /* // Add new ilk to the IlkRegistry */
+        /* IlkRegistryAbstract(ILK_REGISTRY).add(MCD_JOIN_GUSD_A); */
     }
 }
 
 contract DssSpell {
-    DSPauseAbstract  public pause =
-        DSPauseAbstract(0x8754E6ecb4fe68DaA5132c2886aB39297a5c7189);
-    address          public action;
-    bytes32          public tag;
-    uint256          public eta;
-    bytes            public sig;
-    uint256          public expiration;
-    bool             public done;
+    DSPauseAbstract public pause =
+        DSPauseAbstract(0xbE286431454714F511008713973d3B053A2d38f3);
+    address         public action;
+    bytes32         public tag;
+    uint256         public eta;
+    bytes           public sig;
+    uint256         public expiration;
+    bool            public done;
+
+    // Provides a descriptive tag for bot consumption
+    // This should be modified weekly to provide a summary of the actions
+    // Hash: seth keccak -- "$(wget https://raw.githubusercontent.com/makerdao/community/a67032a357000839ae08c7523abcf9888c8cca3a/governance/votes/Executive%20vote%20-%20November%2013%2C%202020.md -q -O - 2>/dev/null)"
+    string constant public description =
+        "2020-11-13 MakerDAO Executive Spell | Hash: 0xa2b54a94b44575d01239378e48f966c4e583b965172be0a8c4b59b74523683ff";
 
     constructor() public {
         sig = abi.encodeWithSignature("execute()");
@@ -160,6 +189,14 @@ contract DssSpell {
         expiration = now + 30 days;
     }
 
+    modifier officeHours {
+        uint day = (now / 1 days + 3) % 7;
+        require(day < 5, "Can only be cast on a weekday");
+        uint hour = now / 1 hours % 24;
+        require(hour >= 14 && hour < 21, "Outside office hours");
+        _;
+    }
+
     function schedule() public {
         require(now <= expiration, "This contract has expired");
         require(eta == 0, "This spell has already been scheduled");
@@ -167,7 +204,7 @@ contract DssSpell {
         pause.plot(action, tag, sig, eta);
     }
 
-    function cast() public {
+    function cast() public officeHours {
         require(!done, "spell-already-cast");
         done = true;
         pause.exec(action, tag, sig, eta);
