@@ -17,6 +17,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pragma solidity >=0.5.12;
+import "lib/dss-interfaces/src/dss/FlipAbstract.sol";
 import "./lib.sol";
 
 interface GemLike {
@@ -53,7 +54,6 @@ interface AssessorLike {
     function calcTokenPrices() external returns (uint, uint);
 }
 
-import "lib/dss-interfaces/src/dss/FlipAbstract.sol";
 // This contract is essentially a merge of
 // a join and a cdp-manager.
 
@@ -105,10 +105,12 @@ contract TinlakeManager is LibNote {
     GemJoinLike public daiJoin;
 
     // Tinlake components
-    GemLike      public drop;
+    GemLike      public gem;
     GemLike      public tin;
     RedeemLike   public pool;
     AssessorLike public assessor;
+
+    uint public constant dec = 18;
 
     constructor(address vat_,    address dai_,
                 address flip_,   address daiJoin_,
@@ -123,7 +125,7 @@ contract TinlakeManager is LibNote {
         vow = vow_;
         daiJoin = GemJoinLike(daiJoin_);
 
-        drop = GemLike(drop_);
+        gem = GemLike(drop_);
         tin = GemLike(tin_);
         pool = RedeemLike(pool_);
         assessor = AssessorLike(assessor_);
@@ -139,8 +141,8 @@ contract TinlakeManager is LibNote {
 
         dai.approve(daiJoin_, uint(-1));
         vat.hope(daiJoin_);
-        drop.approve(pool_, uint(-1));
-        drop.approve(tranche, uint(-1));
+        gem.approve(pool_, uint(-1));
+        gem.approve(tranche, uint(-1));
     }
 
     // --- Math ---
@@ -166,7 +168,7 @@ contract TinlakeManager is LibNote {
     function join(uint wad) public ownerOnly note {
         require(safe && glad && live);
         require(int(wad) >= 0, "TinlakeManager/overflow");
-        drop.transferFrom(msg.sender, address(this), wad);
+        gem.transferFrom(msg.sender, address(this), wad);
         vat.slip(ilk, address(this), int(wad));
         vat.frob(ilk, address(this), address(this), address(this), int(wad), 0);
     }
@@ -176,7 +178,7 @@ contract TinlakeManager is LibNote {
         require(int(wad) >= 0, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this), -int(wad), 0);
         vat.slip(ilk, address(this), -int(wad));
-        drop.transfer(usr, wad);
+        gem.transfer(usr, wad);
     }
 
     // draw & wipe call daiJoin.exit/join immediately
@@ -210,7 +212,7 @@ contract TinlakeManager is LibNote {
     function tellCondition() internal returns (bool) {
         (uint juniorPrice, uint seniorPrice) = assessor.calcTokenPrices();
 
-        uint seniorValue = mul(seniorPrice, drop.totalSupply());
+        uint seniorValue = mul(seniorPrice, gem.totalSupply());
 
         return seniorValue > mul(limit, add(seniorValue, mul(juniorPrice, tin.totalSupply())));
     }
@@ -220,7 +222,7 @@ contract TinlakeManager is LibNote {
         require(safe && glad && live);
         require(tellCondition() || wards[msg.sender] == 1);
         safe = false;
-        uint balance = drop.balanceOf(address(this));
+        uint balance = gem.balanceOf(address(this));
         debt = balance;
         pool.redeemOrder(balance);
     }
@@ -258,9 +260,10 @@ contract TinlakeManager is LibNote {
         require(guy != address(0));
         tab = tab_; 
         glad = false;
+        safe = false; // in most cases, safe will already be false.
     }
 
-    function recover(uint endEpoch, uint id) public note {
+    function recover(uint endEpoch) public note {
         require(!safe && !glad && live, "TinlakeManager/Pool-healhty");
 
         (uint returned, , ,uint remainingDrop) = pool.disburse(endEpoch);
