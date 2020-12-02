@@ -1,4 +1,6 @@
 // Copyright (C) 2020 Maker Ecosystem Growth Holdings, INC.
+// 2020 Lucas Vogelsang <lucas@centrifuge.io>,
+// 2020 Martin Lundfall <martin.lundfall@gmail.com>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -71,18 +73,17 @@ contract SpellAction {
         address MCD_SPOT     = CHANGELOG.getAddress("MCD_SPOT");
         address MCD_END      = CHANGELOG.getAddress("MCD_END");
         address FLIPPER_MOM  = CHANGELOG.getAddress("FLIPPER_MOM");
-        //address OSM_MOM      = CHANGELOG.getAddress("OSM_MOM");
         address ILK_REGISTRY = CHANGELOG.getAddress("ILK_REGISTRY");
 
-        // Add DROP contracts to the changelog
-        CHANGELOG.setAddress("DROP", DROP);
-        CHANGELOG.setAddress("MCD_DROP_MGR_A", MCD_DROP_MGR_A);
-        CHANGELOG.setAddress("MCD_FLIP_DROP_A", MCD_FLIP_DROP_A);
+        // Add NS2DRP contracts to the changelog
+        CHANGELOG.setAddress("NS2DRP", DROP);
+        CHANGELOG.setAddress("MCD_NS2DRP_MGR_A", MCD_DROP_MGR_A);
+        CHANGELOG.setAddress("MCD_FLIP_NS2DRP_A", MCD_FLIP_DROP_A);
         CHANGELOG.setAddress("PIP_DROP", PIP_DROP);
 
         //        CHANGELOG.setVersion("1.1.5");
 
-        bytes32 ilk = "DROP-A";
+        bytes32 ilk = "NS2DRP-A";
 
         // Sanity checks
         require(GemJoinAbstract(MCD_DROP_MGR_A).vat() == MCD_VAT, "join-vat-not-match");
@@ -96,65 +97,46 @@ contract SpellAction {
         // Set the DROP PIP in the Spotter
         SpotAbstract(MCD_SPOT).file(ilk, "pip", PIP_DROP);
 
-        // Set the DROP-A Flipper in the Cat
+        // Set the NS2DRRP-A Flipper in the Cat
         CatAbstract(MCD_CAT).file(ilk, "flip", MCD_FLIP_DROP_A);
 
-        // Init DROP-A ilk in Vat & Jug
+        // Init NS2DRP-A ilk in Vat & Jug
         VatAbstract(MCD_VAT).init(ilk);
         JugAbstract(MCD_JUG).init(ilk);
 
-        // Allow DROP-A Join to modify Vat registry
+        // Allow NS2DRP-A Join to modify Vat registry
         VatAbstract(MCD_VAT).rely(MCD_DROP_MGR_A);
-        // Allow the DROP-A Flipper to reduce the Cat litterbox on deal()
+        // Allow the NS2DRP-A Flipper to reduce the Cat litterbox on deal()
         CatAbstract(MCD_CAT).rely(MCD_FLIP_DROP_A);
-        // Allow Cat to kick auctions in DROP-A Flipper
+        // Allow Cat to kick auctions in NS2DRP-A Flipper
         FlipAbstract(MCD_FLIP_DROP_A).rely(MCD_CAT);
-        // Allow End to yank auctions in DROP-A Flipper
+        // Allow End to yank auctions in NS2DRP-A Flipper
         FlipAbstract(MCD_FLIP_DROP_A).rely(MCD_END);
-        // Allow FlipperMom to access to the DROP-A Flipper
+        // Allow FlipperMom to access to the NS2DRP-A Flipper
         FlipAbstract(MCD_FLIP_DROP_A).rely(FLIPPER_MOM);
-        // Disallow Cat to kick auctions in DROP-A Flipper
-        // !!!!!!!! Only for certain collaterals that do not trigger liquidations like USDC-A)
-        // FlipperMomAbstract(FLIPPER_MOM).deny(MCD_FLIP_GUSD_A);
-
-        // Allow OsmMom to access to the DROP Osm
-        // !!!!!!!! Only if PIP_DROP = Osm and hasn't been already relied due a previous deployed ilk
-        // OsmAbstract(PIP_DROP).rely(OSM_MOM);
-        // Whitelist Osm to read the Median data (only necessary if it is the first time the token is being added to an ilk)
-        // !!!!!!!! Only if PIP_DROP = Osm, its src is a Median and hasn't been already whitelisted due a previous deployed ilk
-        // MedianAbstract(OsmAbstract(PIP_DROP).src()).kiss(PIP_DROP);
-        // Whitelist Spotter to read the Osm data (only necessary if it is the first time the token is being added to an ilk)
-        // !!!!!!!! Only if PIP_DROP = Osm or PIP_DROP = Median and hasn't been already whitelisted due a previous deployed ilk
-        // OsmAbstract(PIP_DROP).kiss(MCD_SPOT);
-        // Whitelist End to read the Osm data (only necessary if it is the first time the token is being added to an ilk)
-        // !!!!!!!! Only if PIP_DROP = Osm or PIP_DROP = Median and hasn't been already whitelisted due a previous deployed ilk
-        // OsmAbstract(PIP_DROP).kiss(MCD_END);
-        // Set DROP Osm in the OsmMom for new ilk
-        // !!!!!!!! Only if PIP_DROP = Osm
-        //OsmMomAbstract(OSM_MOM).setOsm(ilk, PIP_DROP);
 
         // Set the global debt ceiling
         VatAbstract(MCD_VAT).file("Line", 1_468_750_000 * RAD);
-        // Set the DROP-A debt ceiling
+        // Set the NS2DRP-A debt ceiling
         VatAbstract(MCD_VAT).file(ilk, "line", 5 * MILLION * RAD);
-        // Set the DROP-A dust
+        // Set the NS2DRP-A dust
         VatAbstract(MCD_VAT).file(ilk, "dust", 100 * RAD);
         // Set the Lot size
         CatAbstract(MCD_CAT).file(ilk, "dunk", 50 * MILLION * RAD);
-        // Set the DROP-A liquidation penalty (e.g. 13% => X = 113)
+        // Set the NS2DRP-A liquidation penalty (e.g. 13% => X = 113)
         CatAbstract(MCD_CAT).file(ilk, "chop", 113 * WAD / 100);
-        // Set the DROP-A stability fee (e.g. 1% = 1000000000315522921573372069)
+        // Set the NS2DRP-A stability fee (e.g. 1% = 1000000000315522921573372069)
         JugAbstract(MCD_JUG).file(ilk, "duty", FOUR_PERCENT_RATE);
-        // Set the DROP-A percentage between bids (e.g. 3% => X = 103)
+        // Set the NS2DRP-A percentage between bids (e.g. 3% => X = 103)
         FlipAbstract(MCD_FLIP_DROP_A).file("beg", 103 * WAD / 100);
-        // Set the DROP-A time max time between bids
+        // Set the NS2DRP-A time max time between bids
         FlipAbstract(MCD_FLIP_DROP_A).file("ttl", 6 hours);
-        // Set the DROP-A max auction duration to
+        // Set the NS2DRP-A max auction duration to
         FlipAbstract(MCD_FLIP_DROP_A).file("tau", 6 hours);
-        // Set the DROP-A min collateralization ratio (e.g. 150% => X = 150)
+        // Set the NS2DRP-A min collateralization ratio (e.g. 150% => X = 150)
         SpotAbstract(MCD_SPOT).file(ilk, "mat", 105 * RAY / 100);
 
-        // Update DROP-A spot value in Vat
+        // Update NS2DRP-A spot value in Vat
         SpotAbstract(MCD_SPOT).poke(ilk);
 
         // Add new ilk to the IlkRegistry

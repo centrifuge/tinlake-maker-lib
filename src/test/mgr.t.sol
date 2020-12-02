@@ -26,7 +26,7 @@ interface MemberList {
 
 
 contract TinlakeManagerTest is DSTest {
-    bytes32 constant ilk = "DROP-A"; // New Collateral Type
+    bytes32 constant ilk = "NS2DRP-A"; // New Collateral Type
     uint constant ONE = 10 ** 27;
 
     function add(uint x, uint y) internal pure returns (uint z) {
@@ -65,7 +65,7 @@ contract TinlakeManagerTest is DSTest {
     Root constant root = Root(0x53b2d22d07E069a3b132BfeaaD275b10273d381E);
     MemberList constant memberlist = MemberList(0x5B5CFD6E45F1407ABCb4BFD9947aBea1EA6649dA);
     EpochCoordinator constant coordinator = EpochCoordinator(0xFE860d06fF2a3A485922A6a029DFc1CD8A335288);
-    
+
     function setUp() public {
         vat = VatAbstract(CHANGELOG.getAddress("MCD_VAT"));
         vow = VowAbstract(CHANGELOG.getAddress("MCD_VOW"));
@@ -80,7 +80,7 @@ contract TinlakeManagerTest is DSTest {
 
         // deploy custom pip which just forwards to `calcTokenPrices`
         dropPip = new DSValue();
-        
+
         // deploy dropMgr
         dropMgr = new TinlakeManager(address(vat),
                                      CHANGELOG.getAddress("MCD_DAI"),
@@ -101,7 +101,7 @@ contract TinlakeManagerTest is DSTest {
         spell.schedule();
         hevm.warp(now + 2 weeks);
         spell.cast();
-        
+
         // welcome to hevm KYC
         hevm.store(address(root), keccak256(abi.encode(address(this), uint(0))), bytes32(uint(1)));
         root.relyContract(address(memberlist), address(this));

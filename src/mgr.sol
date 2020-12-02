@@ -257,7 +257,7 @@ contract TinlakeManager is LibNote {
     }
 
     // --- Writeoff ---
-    // Has the `cat` has bitten the cdp?
+    // Has the `cat` bitten the cdp?
     function sad(uint id) public returns (bool) {
         require(flip.kicks() > 0);
         require(glad);
