@@ -228,7 +228,7 @@ contract TinlakeManagerTest is DSTest {
         dropMgr.recover(coordinator.currentEpoch());
         // we should have recovered a bit of the debt
         // (bar some rounding errors
-        assertEq(vat.dai(address(vow)) - vowBal / ONE, 400 ether * seniorPrice / ONE);
+        assertEq((vat.dai(address(vow)) - vowBal) / ONE, 400 ether * seniorPrice / ONE);
     }
 
     /* function testFlip() public { */

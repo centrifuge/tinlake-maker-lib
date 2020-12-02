@@ -208,6 +208,10 @@ contract TinlakeManager is LibNote {
         else revert("Mgr/file-unrecognized-param");
     }
 
+    function setOwner(address newOwner) external ownerOnly {
+        owner = newOwner;
+    }
+
     // --- Soft liquidiation condition ---
     function tellCondition() internal returns (bool) {
         (uint juniorPrice, uint seniorPrice) = assessor.calcTokenPrices();
