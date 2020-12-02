@@ -24,7 +24,7 @@ jobs:
         with:
           skip_adding_nixpkgs_channel: false
       - uses: cachix/cachix-action@49b785b55a80c6a82e616bd3a69317f05dca5137
-        with:
+         with:
           name: dapp
           skipPush: true
           signingKey: ''
