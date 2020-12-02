@@ -29,4 +29,6 @@ jobs:
           skipPush: true
           signingKey: ''
       - name: test
+        env:
+          ETH_RPC_URL: ${{ secrets.ETH_RPC_URL }}
         run: nix-shell --pure --command "make test"
