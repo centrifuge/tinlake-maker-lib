@@ -1,0 +1,37 @@
+/// value.sol - a value is a simple thing, it can be get and set
+
+// Copyright (C) 2017  DappHub, LLC
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+pragma solidity >=0.5.15;
+
+import 'ds-thing/thing.sol';
+
+interface AssessorLike {
+    function calcTokenPrices() external view returns (uint, uint);
+}
+
+contract DSValue is DSThing {
+    AssessorLike constant public assessor = AssessorLike(0xdA0bA5Dd06C8BaeC53Fa8ae25Ad4f19088D6375b);
+    function peek() public view returns (bytes32, bool) {
+        (, uint seniorPrice) = assessor.calcTokenPrices();
+        return (bytes32(seniorPrice), seniorPrice != 0);
+    }
+    function read() public view returns (bytes32) {
+        (, uint seniorPrice) = assessor.calcTokenPrices();
+        require(seniorPrice != 0);
+        return bytes32(seniorPrice);
+    }
+}

@@ -4,7 +4,7 @@ import "ds-test/test.sol";
 import "../mgr.sol";
 import "../spell.sol";
 import "lib/dss-interfaces/src/Interfaces.sol";
-import "ds-value/value.sol";
+import {DSValue} from "../value.sol";
 import {EpochCoordinator} from "tinlake/lender/coordinator.sol";
 
 interface FlipFabLike {
@@ -62,9 +62,8 @@ contract TinlakeManagerTest is DSTest {
                                                          address(cat),
                                                          ilk));
 
-        // deploy dropPip
+        // deploy custom pip which just forwards to `calcTokenPrices`
         dropPip = new DSValue();
-        dropPip.poke(bytes32(uint(2 ether)));
         
         // deploy dropMgr
         dropMgr = new TinlakeManager(address(vat),
@@ -94,11 +93,11 @@ contract TinlakeManagerTest is DSTest {
 
         memberlist.updateMember(address(dropMgr), uint(-1));
 
-        // give this address 500 dai and 100 drop
-        hevm.store(address(dai), keccak256(abi.encode(address(this), uint(2))), bytes32(uint(500 ether)));
-        hevm.store(address(drop), keccak256(abi.encode(address(this), uint(8))), bytes32(uint(100 ether)));
-        assertEq(dai.balanceOf(address(this)), 500 ether);
-        assertEq(drop.balanceOf(address(this)), 100 ether);
+        // give this address 1500 dai and 1000 drop
+        hevm.store(address(dai), keccak256(abi.encode(address(this), uint(2))), bytes32(uint(1500 ether)));
+        hevm.store(address(drop), keccak256(abi.encode(address(this), uint(8))), bytes32(uint(1000 ether)));
+        assertEq(dai.balanceOf(address(this)), 1500 ether);
+        assertEq(drop.balanceOf(address(this)), 1000 ether);
 
         // approve the manager
         drop.approve(address(dropMgr), uint(-1));
@@ -129,7 +128,7 @@ contract TinlakeManagerTest is DSTest {
 
 
     function testSanity() public {
-        assertEq(address(dropMgr.vat), address(vat));
+        assertEq(address(dropMgr.vat()), address(vat));
     }
 
     /* function testVariables() public { */
@@ -147,34 +146,35 @@ contract TinlakeManagerTest is DSTest {
     /* } */
 
     function testJoinAndDraw() public {
-        assertEq(dai.balanceOf(address(this)), 500 ether);
-        assertEq(drop.balanceOf(address(this)), 100 ether);
-        dropMgr.join(100 ether);
-        dropMgr.draw(100 ether, address(this));
-        assertEq(dai.balanceOf(address(this)), 600 ether);
-        assertEq(drop.balanceOf(address(this)), 0 ether);
-        assertEq(drop.balanceOf(address(dropMgr)), 100 ether);
+        assertEq(dai.balanceOf(address(this)), 1500 ether);
+        assertEq(drop.balanceOf(address(this)), 1000 ether);
+        dropMgr.join(200 ether);
+        dropMgr.draw(200 ether, address(this));
+        assertEq(dai.balanceOf(address(this)), 1700 ether);
+        assertEq(drop.balanceOf(address(this)), 800 ether);
+        assertEq(drop.balanceOf(address(dropMgr)), 200 ether);
     }
 
     function testWipeAndExit() public {
         testJoinAndDraw();
-        dropMgr.wipe(1 ether);
-        dropMgr.exit(address(this), 1 ether);
-        assertEq(dai.balanceOf(address(this)), 599 ether);
-        assertEq(drop.balanceOf(address(this)), 1 ether);
+        dropMgr.wipe(10 ether);
+        dropMgr.exit(address(this), 10 ether);
+        assertEq(dai.balanceOf(address(this)), 1690 ether);
+        assertEq(drop.balanceOf(address(this)), 810 ether);
     }
 
     function testTellAndUnwind() public {
         testJoinAndDraw();
-        assertEq(drop.balanceOf(address(dropMgr)), 100 ether);
+        assertEq(drop.balanceOf(address(dropMgr)), 200 ether);
         // we are authorized, so can call tell() even if tellCondition is not met.
         dropMgr.tell();
         // all of the drop is in the redeemer now
         assertEq(drop.balanceOf(address(dropMgr)), 0);
-        hevm.warp(now + 2 days);
         coordinator.closeEpoch();
-        dropMgr.unwind(2);
-        assertEq(dai.balanceOf(address(this)), 604 ether);
+        hevm.warp(now + 2 days);
+        dropMgr.unwind(coordinator.currentEpoch());
+        // the cdp should now be debt free
+        assertEq(dropMgr.cdptab(), 0);
     }
 
     /* function testKick() public { */
