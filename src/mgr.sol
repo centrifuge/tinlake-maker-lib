@@ -256,9 +256,11 @@ contract TinlakeManager is LibNote {
     // Has the `cat` has bitten the cdp?
     function sad(uint id) public returns (bool) {
         require(flip.kicks() > 0);
+        require(glad);
         ( , ,address guy , , , , , uint tab_) = flip.bids(id);
         require(guy != address(0));
-        tab = tab_; 
+        tab = tab_;
+        pool.redeemOrder(gem.balanceOf(address(this)));
         glad = false;
         safe = false; // in most cases, safe will already be false.
     }

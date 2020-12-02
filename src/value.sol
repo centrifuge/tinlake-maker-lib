@@ -27,11 +27,11 @@ contract DSValue is DSThing {
     AssessorLike constant public assessor = AssessorLike(0xdA0bA5Dd06C8BaeC53Fa8ae25Ad4f19088D6375b);
     function peek() public view returns (bytes32, bool) {
         (, uint seniorPrice) = assessor.calcTokenPrices();
-        return (bytes32(seniorPrice), seniorPrice != 0);
+        return (bytes32(seniorPrice / 10**9), seniorPrice != 0);
     }
     function read() public view returns (bytes32) {
         (, uint seniorPrice) = assessor.calcTokenPrices();
         require(seniorPrice != 0);
-        return bytes32(seniorPrice);
+        return bytes32(seniorPrice / 10**9);
     }
 }
