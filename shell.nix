@@ -11,6 +11,6 @@ in
     name = "tinlake-maker-lib";
     buildInputs = with pkgs; [
       pkgs.dapp
-      pkgs.solc-versions.solc_0_5_12
+      pkgs.solc-versions.solc_0_5_15
     ];
   }
