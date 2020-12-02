@@ -39,7 +39,6 @@ contract TinlakeManagerTest is DSTest {
         z = add(x, sub(y, 1)) / y;
     }
 
-
     // MCD
     VatAbstract vat;
     CatAbstract cat;
@@ -51,7 +50,6 @@ contract TinlakeManagerTest is DSTest {
     DSChiefAbstract constant chief = DSChiefAbstract(0x9eF05f7F6deB616fd37aC3c959a2dDD25A54E4F5);
     DSTokenAbstract constant gov   = DSTokenAbstract(0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2);
     address constant pause_proxy = 0xBE8E3e3618f7474F8cB1d074A26afFef007E98FB;
-
 
     // -- testing --
     Hevm constant hevm = Hevm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
@@ -77,8 +75,8 @@ contract TinlakeManagerTest is DSTest {
         flipfab = FlipFabLike(CHANGELOG.getAddress("FLIP_FAB"));
 
         flip = FlipAbstract(flipfab.newFlip(address(vat),
-                                                         address(cat),
-                                                         ilk));
+                                            address(cat),
+                                            ilk));
 
         // deploy custom pip which just forwards to `calcTokenPrices`
         dropPip = new DSValue();
@@ -123,45 +121,9 @@ contract TinlakeManagerTest is DSTest {
 
     }
 
-    function vote() private {
-        if (chief.hat() != address(spell)) {
-            hevm.store(
-                address(gov),
-                keccak256(abi.encode(address(this), uint256(1))),
-                bytes32(uint256(999999999999 ether))
-            );
-            gov.approve(address(chief), uint256(-1));
-            chief.lock(999999999998 ether);
-
-            assertTrue(!spell.done());
-
-            address[] memory yays = new address[](1);
-            yays[0] = address(spell);
-
-            chief.vote(yays);
-            chief.lift(address(spell));
-        }
-        assertEq(chief.hat(), address(spell));
-    }
-
-
     function testSanity() public {
         assertEq(address(dropMgr.vat()), address(vat));
     }
-
-    /* function testVariables() public { */
-    /*     (,,,uint line,) = vat.ilks(ilk); */
-    /*     assertEq(line, uint(10000 * 10 ** 45)); */
-    /*     (, uint mat) = spotter.ilks(ilk); */
-    /*     assertEq(mat, uint(1500000000 ether)); */
-    /*     (uint tax,) = jug.ilks(ilk); */
-    /*     assertEq(tax, uint(1.05 * 10 ** 27)); */
-    /*     (address flip, uint chop, uint lump) = cat.ilks(ilk); */
-    /*     assertEq(flip, address(dropMgr)); */
-    /*     assertEq(chop, ONE); */
-    /*     assertEq(lump, uint(10000 ether)); */
-    /*     assertEq(vat.wards(address(dropMgr)), 1); */
-    /* } */
 
     function testJoinAndDraw() public {
         assertEq(dai.balanceOf(address(this)), 1500 ether);
@@ -231,25 +193,24 @@ contract TinlakeManagerTest is DSTest {
         assertEq((vat.dai(address(vow)) - vowBal) / ONE, 400 ether * seniorPrice / ONE);
     }
 
-    /* function testFlip() public { */
-    /*     assertEq(address(seniorTranche), address(seniorOperator.tranche())); */
-    /*     this.file(address(cat), ilk, "lump", uint(1 ether)); // 1 unit of collateral per batch */
-    /*     this.file(address(cat), ilk, "chop", ONE); */
-    /*     dropJoin.join(address(this), 1 ether); */
-    /*     vat.frob(ilk, address(this), address(this), address(this), 1 ether, 1 ether); // Maximun DAI generated */
-    /*     dropPip.poke(bytes32(uint(1))); */
-    /*     spotter.poke(ilk); */
-    /*     assertEq(vat.gem(ilk, address(dropFlip)), 0); */
-    /*     uint batchId = cat.bite(ilk, address(this)); */
-    /*     (uint epoch, uint supplyOrd, uint redeemOrd) = seniorTranche.users(address(dropFlip)); */
-    /*     assertEq(redeemOrd, 1 ether); */
+    function vote() private {
+        if (chief.hat() != address(spell)) {
+            hevm.store(
+                address(gov),
+                keccak256(abi.encode(address(this), uint256(1))),
+                bytes32(uint256(999999999999 ether))
+            );
+            gov.approve(address(chief), uint256(-1));
+            chief.lock(999999999998 ether);
 
-    /*     hevm.warp(now + 1 days); */
-    /*     coordinator.closeEpoch(); */
+            assertTrue(!spell.done());
 
-    /*     assertEq(dropFlip.tab(), 1 ether * 10**27); */
-    /*     dropFlip.take(); */
-    /*     assertEq(dropFlip.tab(), 0); */
+            address[] memory yays = new address[](1);
+            yays[0] = address(spell);
 
-    /* } */
+            chief.vote(yays);
+            chief.lift(address(spell));
+        }
+        assertEq(chief.hat(), address(spell));
+    }
 }
