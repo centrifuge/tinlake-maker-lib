@@ -44,10 +44,10 @@ contract SpellAction {
     //     https://changelog.makerdao.com/releases/mainnet/1.1.4/contracts.json
     ChainlogAbstract constant CHANGELOG = ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
 
-    address constant DROP            = 0xE4C72b4dE5b0F9ACcEA880Ad0b1F944F85A9dAA0; //mainnet value
-    address constant MCD_DROP_MGR_A  = 0xEcEDFd8BA8ae39a6Bd346Fe9E5e0aBeA687fFF31; //TODO: update with actual manager!
-    address constant MCD_FLIP_DROP_A = 0xF5b8cD9dB5a0EC031304A7B815010aa7761BD426; //TODO: update with actual flip value!
-    address constant PIP_DROP        = 0xDB356e865AAaFa1e37764121EA9e801Af13eEb83; //TODO: update with actual pip drop!
+    address constant NS2DRP            = 0xE4C72b4dE5b0F9ACcEA880Ad0b1F944F85A9dAA0; //mainnet value
+    address constant MCD_NS2DRP_MGR_A  = 0xEcEDFd8BA8ae39a6Bd346Fe9E5e0aBeA687fFF31; //TODO: update with actual manager!
+    address constant MCD_FLIP_NS2DRP_A = 0xF5b8cD9dB5a0EC031304A7B815010aa7761BD426; //TODO: update with actual flip value!
+    address constant PIP_NS2DRP        = 0xDB356e865AAaFa1e37764121EA9e801Af13eEb83; //TODO: update with actual pip drop!
 
     // Decimals & precision
     uint256 constant THOUSAND = 10 ** 3;
@@ -65,6 +65,8 @@ contract SpellAction {
     // A table of rates can be found at
     //    https://ipfs.io/ipfs/QmefQMseb3AiTapiAKKexdKHig8wroKuZbmLtPLv4u2YwW
     uint256 constant FOUR_PERCENT_RATE = 1000000001243680656318820312;
+    // should be 3.6%
+    // 1000000001121484774769253326
 
     function execute() external {
         address MCD_VAT      = CHANGELOG.getAddress("MCD_VAT");
@@ -76,44 +78,44 @@ contract SpellAction {
         address ILK_REGISTRY = CHANGELOG.getAddress("ILK_REGISTRY");
 
         // Add NS2DRP contracts to the changelog
-        CHANGELOG.setAddress("NS2DRP", DROP);
-        CHANGELOG.setAddress("MCD_NS2DRP_MGR_A", MCD_DROP_MGR_A);
-        CHANGELOG.setAddress("MCD_FLIP_NS2DRP_A", MCD_FLIP_DROP_A);
-        CHANGELOG.setAddress("PIP_DROP", PIP_DROP);
+        CHANGELOG.setAddress("NS2DRP", NS2DRP);
+        CHANGELOG.setAddress("MCD_NS2DRP_MGR_A", MCD_NS2DRP_MGR_A);
+        CHANGELOG.setAddress("MCD_FLIP_NS2DRP_A", MCD_FLIP_NS2DRP_A);
+        CHANGELOG.setAddress("PIP_NS2DRP", PIP_NS2DRP);
 
         //        CHANGELOG.setVersion("1.1.5");
 
         bytes32 ilk = "NS2DRP-A";
 
         // Sanity checks
-        require(GemJoinAbstract(MCD_DROP_MGR_A).vat() == MCD_VAT, "join-vat-not-match");
-        require(GemJoinAbstract(MCD_DROP_MGR_A).ilk() == ilk, "join-ilk-not-match");
-        require(GemJoinAbstract(MCD_DROP_MGR_A).gem() == DROP, "join-gem-not-match");
-        require(GemJoinAbstract(MCD_DROP_MGR_A).dec() == 18, "join-dec-not-match");
-        require(FlipAbstract(MCD_FLIP_DROP_A).vat() == MCD_VAT, "flip-vat-not-match");
-        require(FlipAbstract(MCD_FLIP_DROP_A).cat() == MCD_CAT, "flip-cat-not-match");
-        require(FlipAbstract(MCD_FLIP_DROP_A).ilk() == ilk, "flip-ilk-not-match");
+        require(GemJoinAbstract(MCD_NS2DRP_MGR_A).vat() == MCD_VAT, "join-vat-not-match");
+        require(GemJoinAbstract(MCD_NS2DRP_MGR_A).ilk() == ilk, "join-ilk-not-match");
+        require(GemJoinAbstract(MCD_NS2DRP_MGR_A).gem() == NS2DRP, "join-gem-not-match");
+        require(GemJoinAbstract(MCD_NS2DRP_MGR_A).dec() == 18, "join-dec-not-match");
+        require(FlipAbstract(MCD_FLIP_NS2DRP_A).vat() == MCD_VAT, "flip-vat-not-match");
+        require(FlipAbstract(MCD_FLIP_NS2DRP_A).cat() == MCD_CAT, "flip-cat-not-match");
+        require(FlipAbstract(MCD_FLIP_NS2DRP_A).ilk() == ilk, "flip-ilk-not-match");
 
         // Set the DROP PIP in the Spotter
-        SpotAbstract(MCD_SPOT).file(ilk, "pip", PIP_DROP);
+        SpotAbstract(MCD_SPOT).file(ilk, "pip", PIP_NS2DRP);
 
-        // Set the NS2DRRP-A Flipper in the Cat
-        CatAbstract(MCD_CAT).file(ilk, "flip", MCD_FLIP_DROP_A);
+        // Set the NS2DRP-A Flipper in the Cat
+        CatAbstract(MCD_CAT).file(ilk, "flip", MCD_FLIP_NS2DRP_A);
 
         // Init NS2DRP-A ilk in Vat & Jug
         VatAbstract(MCD_VAT).init(ilk);
         JugAbstract(MCD_JUG).init(ilk);
 
         // Allow NS2DRP-A Join to modify Vat registry
-        VatAbstract(MCD_VAT).rely(MCD_DROP_MGR_A);
+        VatAbstract(MCD_VAT).rely(MCD_NS2DRP_MGR_A);
         // Allow the NS2DRP-A Flipper to reduce the Cat litterbox on deal()
-        CatAbstract(MCD_CAT).rely(MCD_FLIP_DROP_A);
+        CatAbstract(MCD_CAT).rely(MCD_FLIP_NS2DRP_A);
         // Allow Cat to kick auctions in NS2DRP-A Flipper
-        FlipAbstract(MCD_FLIP_DROP_A).rely(MCD_CAT);
+        FlipAbstract(MCD_FLIP_NS2DRP_A).rely(MCD_CAT);
         // Allow End to yank auctions in NS2DRP-A Flipper
-        FlipAbstract(MCD_FLIP_DROP_A).rely(MCD_END);
+        FlipAbstract(MCD_FLIP_NS2DRP_A).rely(MCD_END);
         // Allow FlipperMom to access to the NS2DRP-A Flipper
-        FlipAbstract(MCD_FLIP_DROP_A).rely(FLIPPER_MOM);
+        FlipAbstract(MCD_FLIP_NS2DRP_A).rely(FLIPPER_MOM);
 
         // Set the global debt ceiling
         VatAbstract(MCD_VAT).file("Line", 1_468_750_000 * RAD);
@@ -128,11 +130,11 @@ contract SpellAction {
         // Set the NS2DRP-A stability fee (e.g. 1% = 1000000000315522921573372069)
         JugAbstract(MCD_JUG).file(ilk, "duty", FOUR_PERCENT_RATE);
         // Set the NS2DRP-A percentage between bids (e.g. 3% => X = 103)
-        FlipAbstract(MCD_FLIP_DROP_A).file("beg", 103 * WAD / 100);
+        FlipAbstract(MCD_FLIP_NS2DRP_A).file("beg", 103 * WAD / 100);
         // Set the NS2DRP-A time max time between bids
-        FlipAbstract(MCD_FLIP_DROP_A).file("ttl", 6 hours);
+        FlipAbstract(MCD_FLIP_NS2DRP_A).file("ttl", 6 hours);
         // Set the NS2DRP-A max auction duration to
-        FlipAbstract(MCD_FLIP_DROP_A).file("tau", 6 hours);
+        FlipAbstract(MCD_FLIP_NS2DRP_A).file("tau", 6 hours);
         // Set the NS2DRP-A min collateralization ratio (e.g. 150% => X = 150)
         SpotAbstract(MCD_SPOT).file(ilk, "mat", 105 * RAY / 100);
 
@@ -140,7 +142,7 @@ contract SpellAction {
         SpotAbstract(MCD_SPOT).poke(ilk);
 
         // Add new ilk to the IlkRegistry
-        IlkRegistryAbstract(ILK_REGISTRY).add(MCD_DROP_MGR_A);
+        IlkRegistryAbstract(ILK_REGISTRY).add(MCD_NS2DRP_MGR_A);
     }
 }
 

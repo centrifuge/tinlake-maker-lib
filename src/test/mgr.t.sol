@@ -93,7 +93,7 @@ contract TinlakeManagerTest is DSTest {
                                      address(this),
                                      0xdA0bA5Dd06C8BaeC53Fa8ae25Ad4f19088D6375b, // assessor
                                      0xfB30B47c47E2fAB74ca5b0c1561C2909b280c4E5, // senior tranche
-                                     bytes32("DROP-A"));
+                                     ilk);
         // cast spell
         spell = new DssSpell();
         flip.rely(address(pause_proxy));
