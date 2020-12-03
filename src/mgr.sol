@@ -184,17 +184,21 @@ contract TinlakeManager is LibNote {
     // draw & wipe call daiJoin.exit/join immediately
     function draw(uint wad, address dst) public ownerOnly note {
         require(safe && glad && live);
-        require(int(wad) >= 0, "TinlakeManager/overflow");
-        vat.frob(ilk, address(this), address(this), address(this), 0, int(wad));
+        (,uint rate, , , ) = vat.ilks(ilk);
+        uint dart = divup(mul(ONE, wad), rate);
+        require(int(dart) >= 0, "TinlakeManager/overflow");
+        vat.frob(ilk, address(this), address(this), address(this), 0, int(dart));
         daiJoin.exit(dst, wad);
     }
 
     function wipe(uint wad) public ownerOnly note {
         require(safe && glad && live);
-        require(int(wad) >= 0, "TinlakeManager/overflow");
         dai.transferFrom(msg.sender, address(this), wad);
         daiJoin.join(address(this), wad);
-        vat.frob(ilk, address(this), address(this), address(this), 0, -int(wad));
+        (,uint rate, , , ) = vat.ilks(ilk);
+        uint dart = mul(ONE, wad) / rate;
+        require(int(dart) >= 0, "TinlakeManager/overflow");
+        vat.frob(ilk, address(this), address(this), address(this), 0, -int(dart));
     }
 
     // --- Administration

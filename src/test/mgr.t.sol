@@ -149,9 +149,10 @@ contract TinlakeManagerTest is DSTest {
         testJoinAndDraw();
         hevm.warp(now + 2 days);
         jug.drip(ilk);
+        assertEq(dropMgr.cdptab() / ONE, 200.038762269592882076 ether);
         dropMgr.wipe(10 ether);
         dropMgr.exit(address(this), 10 ether);
-        assertEq(dropMgr.cdptab(), 0);
+        assertEq(dropMgr.cdptab() / ONE, 190.038762269592882076 ether);
         assertEq(dai.balanceOf(address(this)), 1690 ether);
         assertEq(drop.balanceOf(address(this)), 610 ether);
     }
