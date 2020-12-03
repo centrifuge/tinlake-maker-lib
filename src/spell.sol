@@ -64,9 +64,7 @@ contract SpellAction {
     //
     // A table of rates can be found at
     //    https://ipfs.io/ipfs/QmefQMseb3AiTapiAKKexdKHig8wroKuZbmLtPLv4u2YwW
-    uint256 constant FOUR_PERCENT_RATE = 1000000001243680656318820312;
-    // should be 3.6%
-    // 1000000001121484774769253326
+    uint256 constant NS2DRP_THREEPOINTSIX_PERCENT_RATE = 1000000001121484774769253326;
 
     function execute() external {
         address MCD_VAT      = CHANGELOG.getAddress("MCD_VAT");
@@ -128,7 +126,7 @@ contract SpellAction {
         // Set the NS2DRP-A liquidation penalty (e.g. 13% => X = 113)
         CatAbstract(MCD_CAT).file(ilk, "chop", 113 * WAD / 100);
         // Set the NS2DRP-A stability fee (e.g. 1% = 1000000000315522921573372069)
-        JugAbstract(MCD_JUG).file(ilk, "duty", FOUR_PERCENT_RATE);
+        JugAbstract(MCD_JUG).file(ilk, "duty", NS2DRP_THREEPOINTSIX_PERCENT_RATE);
         // Set the NS2DRP-A percentage between bids (e.g. 3% => X = 103)
         FlipAbstract(MCD_FLIP_NS2DRP_A).file("beg", 103 * WAD / 100);
         // Set the NS2DRP-A time max time between bids

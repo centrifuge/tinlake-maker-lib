@@ -45,6 +45,7 @@ contract TinlakeManagerTest is DSTest {
     VowAbstract vow;
     SpotAbstract spotter;
     DaiAbstract dai;
+    JugAbstract jug;
     FlipFabLike flipfab;
     ChainlogAbstract constant CHANGELOG = ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
     DSChiefAbstract constant chief = DSChiefAbstract(0x9eF05f7F6deB616fd37aC3c959a2dDD25A54E4F5);
@@ -71,6 +72,7 @@ contract TinlakeManagerTest is DSTest {
         vow = VowAbstract(CHANGELOG.getAddress("MCD_VOW"));
         cat = CatAbstract(CHANGELOG.getAddress("MCD_CAT"));
         dai = DaiAbstract(CHANGELOG.getAddress("MCD_DAI"));
+        jug = JugAbstract(CHANGELOG.getAddress("MCD_JUG"));
         spotter = SpotAbstract(CHANGELOG.getAddress("MCD_SPOT"));
         flipfab = FlipFabLike(CHANGELOG.getAddress("FLIP_FAB"));
 
@@ -139,6 +141,17 @@ contract TinlakeManagerTest is DSTest {
         testJoinAndDraw();
         dropMgr.wipe(10 ether);
         dropMgr.exit(address(this), 10 ether);
+        assertEq(dai.balanceOf(address(this)), 1690 ether);
+        assertEq(drop.balanceOf(address(this)), 610 ether);
+    }
+
+    function testAccrueInterest() public {
+        testJoinAndDraw();
+        hevm.warp(now + 2 days);
+        jug.drip(ilk);
+        dropMgr.wipe(10 ether);
+        dropMgr.exit(address(this), 10 ether);
+        assertEq(dropMgr.cdptab(), 0);
         assertEq(dai.balanceOf(address(this)), 1690 ether);
         assertEq(drop.balanceOf(address(this)), 610 ether);
     }
