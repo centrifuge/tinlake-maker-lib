@@ -23,4 +23,3 @@ as a collateral type.
 
 RPC testing with `dapp test --rpc <ETH_RPC_URL>`.
 Use `--cache` for rapid testing.
-

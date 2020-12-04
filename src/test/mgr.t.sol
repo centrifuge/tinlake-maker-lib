@@ -4,7 +4,7 @@ import "ds-test/test.sol";
 import "../mgr.sol";
 import "../spell.sol";
 import "lib/dss-interfaces/src/Interfaces.sol";
-import {DSValue} from "../value.sol";
+import {DSValue} from "ds-value/value.sol";
 import {EpochCoordinator} from "tinlake/lender/coordinator.sol";
 
 interface FlipFabLike {
@@ -46,7 +46,6 @@ contract TinlakeManagerTest is DSTest {
     SpotAbstract spotter;
     DaiAbstract dai;
     JugAbstract jug;
-    FlipFabLike flipfab;
     ChainlogAbstract constant CHANGELOG = ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
     DSChiefAbstract constant chief = DSChiefAbstract(0x9eF05f7F6deB616fd37aC3c959a2dDD25A54E4F5);
     DSTokenAbstract constant gov   = DSTokenAbstract(0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2);
@@ -56,7 +55,6 @@ contract TinlakeManagerTest is DSTest {
     Hevm constant hevm = Hevm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
     DssSpell spell;
     TinlakeManager dropMgr;
-    FlipAbstract flip;
     DSValue dropPip;
 
     // Tinlake
@@ -74,19 +72,14 @@ contract TinlakeManagerTest is DSTest {
         dai = DaiAbstract(CHANGELOG.getAddress("MCD_DAI"));
         jug = JugAbstract(CHANGELOG.getAddress("MCD_JUG"));
         spotter = SpotAbstract(CHANGELOG.getAddress("MCD_SPOT"));
-        flipfab = FlipFabLike(CHANGELOG.getAddress("FLIP_FAB"));
 
-        flip = FlipAbstract(flipfab.newFlip(address(vat),
-                                            address(cat),
-                                            ilk));
-
-        // deploy custom pip which just forwards to `calcTokenPrices`
+        // deploy unmodified pip
         dropPip = new DSValue();
+        dropPip.poke(bytes32(uint(1 ether)));
 
         // deploy dropMgr
         dropMgr = new TinlakeManager(address(vat),
                                      CHANGELOG.getAddress("MCD_DAI"),
-                                     address(flip),
                                      CHANGELOG.getAddress("MCD_JOIN_DAI"),
                                      address(vow),
                                      0xE4C72b4dE5b0F9ACcEA880Ad0b1F944F85A9dAA0, // DROP token
@@ -98,11 +91,11 @@ contract TinlakeManagerTest is DSTest {
                                      ilk);
         // cast spell
         spell = new DssSpell();
-        flip.rely(address(pause_proxy));
         vote();
         spell.schedule();
         hevm.warp(now + 2 weeks);
         spell.cast();
+        jug.drip(ilk);
 
         // welcome to hevm KYC
         hevm.store(address(root), keccak256(abi.encode(address(this), uint(0))), bytes32(uint(1)));
@@ -131,7 +124,7 @@ contract TinlakeManagerTest is DSTest {
         assertEq(dai.balanceOf(address(this)), 1500 ether);
         assertEq(drop.balanceOf(address(this)), 1000 ether);
         dropMgr.join(400 ether);
-        dropMgr.draw(200 ether, address(this));
+        dropMgr.draw(200 ether);
         assertEq(dai.balanceOf(address(this)), 1700 ether);
         assertEq(drop.balanceOf(address(this)), 600 ether);
         assertEq(drop.balanceOf(address(dropMgr)), 400 ether);
@@ -140,7 +133,7 @@ contract TinlakeManagerTest is DSTest {
     function testWipeAndExit() public {
         testJoinAndDraw();
         dropMgr.wipe(10 ether);
-        dropMgr.exit(address(this), 10 ether);
+        dropMgr.exit(10 ether);
         assertEq(dai.balanceOf(address(this)), 1690 ether);
         assertEq(drop.balanceOf(address(this)), 610 ether);
     }
@@ -149,10 +142,10 @@ contract TinlakeManagerTest is DSTest {
         testJoinAndDraw();
         hevm.warp(now + 2 days);
         jug.drip(ilk);
-        assertEq(dropMgr.cdptab() / ONE, 200.038762269592882076 ether);
+        assertEq(cdptab() / ONE, 200.038762269592882076 ether);
         dropMgr.wipe(10 ether);
-        dropMgr.exit(address(this), 10 ether);
-        assertEq(dropMgr.cdptab() / ONE, 190.038762269592882076 ether);
+        dropMgr.exit(10 ether);
+        assertEq(cdptab() / ONE, 190.038762269592882076 ether);
         assertEq(dai.balanceOf(address(this)), 1690 ether);
         assertEq(drop.balanceOf(address(this)), 610 ether);
     }
@@ -160,7 +153,7 @@ contract TinlakeManagerTest is DSTest {
     function testTellAndUnwind() public {
         testJoinAndDraw();
         assertEq(drop.balanceOf(address(dropMgr)), 400 ether);
-        assertEq(divup(dropMgr.cdptab(), ONE), 200 ether);
+        assertEq(divup(cdptab(), ONE), 200 ether);
         assertEq(dai.balanceOf(address(this)), 1700 ether);
         // we are authorized, so can call `tell()`
         // even if tellCondition is not met.
@@ -172,39 +165,35 @@ contract TinlakeManagerTest is DSTest {
         dropMgr.unwind(coordinator.currentEpoch());
         // unwinding should unlock the 400 drop in the manager
         // giving 200 to cover the cdp
-        assertEq(dropMgr.cdptab(), 0 ether); // the cdp should now be debt free
+        assertEq(cdptab(), 0 ether); // the cdp should now be debt free
         // and 200 back to us
         assertEq(dai.balanceOf(address(this)), 1900 ether);
     }
 
-    function testKick() public {
+    function testSinkAndRecover() public {
         testJoinAndDraw();
-        // lower the drop price by cutting the dai reserve balance by 95%
-        bytes32 price = dropPip.read();
-        assertEq(uint(price), 1 ether);
-        uint reserveBalance = uint(hevm.load(reserve, bytes32(uint(6))));
-        hevm.store(reserve, bytes32(uint(6)), bytes32(reserveBalance / 20));
-        (,uint seniorPrice) = assessor.calcTokenPrices();
-        // the drop price is now around 10 cents
-        assertEq(seniorPrice / 10**9, 0.099977903893192444 ether);
-        spotter.poke(ilk);
-        cat.bite(ilk, address(dropMgr));
-        ( , ,address guy , , , , , uint tab_) = flip.bids(1);
-        assertEq(guy, address(cat));
-        assertEq(tab_, 200 ether * ONE * 113 / 100);
-    }
+        hevm.warp(now + 1 days);
+        jug.drip(ilk);
+        uint preSin = vat.sin(address(vow));
+        (, uint rate, , ,) = vat.ilks(ilk);
+        (uint preink, uint preart) = vat.urns(ilk, address(this));
+        dropMgr.tell();
+        dropMgr.sink();
 
-    function testRecover() public {
-        uint vowBal = vat.dai(address(vow));
-        testKick();
-        (,uint seniorPrice) = assessor.calcTokenPrices();
-        dropMgr.sad(1);
+        // the manager now has vat.gems
+        assertEq(vat.gem(ilk, address(dropMgr)), 400 ether);
+        assertEq(preink, 400 ether);
+        // the urn is empty
+        (uint postink, uint postart) = vat.urns(ilk, address(this));
+        assertEq(postink, 0);
+        assertEq(postart, 0);
+        // and the vow has accumulated sin
+        assertEq(vat.sin(address(vow)) - preSin, preart * rate);
+        
+        // try to recover some debt
         coordinator.closeEpoch();
         hevm.warp(now + 2 days);
         dropMgr.recover(coordinator.currentEpoch());
-        // we should have recovered a bit of the debt
-        // (bar some rounding errors
-        assertEq((vat.dai(address(vow)) - vowBal) / ONE, 400 ether * seniorPrice / ONE);
     }
 
     function vote() private {
@@ -226,5 +215,12 @@ contract TinlakeManagerTest is DSTest {
             chief.lift(address(spell));
         }
         assertEq(chief.hat(), address(spell));
+    }
+
+    function cdptab() public returns (uint) {
+        // Calculate DAI cdp debt
+        (, uint art) = vat.urns(ilk, address(dropMgr));
+        (, uint rate, , ,) = vat.ilks(ilk);
+        return art * rate;
     }
 }
