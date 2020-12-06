@@ -2,6 +2,8 @@ all    :; dapp build
 clean  :; dapp clean
 update:
 	dapp update
+build: update
+	dapp build
 test: update
 	dapp test
 deploy :; dapp create TinlakeMakerLib

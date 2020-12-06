@@ -215,8 +215,9 @@ contract TinlakeManager is LibNote {
     }
 
     // --- Liquidation ---
-    function tell() public note auth {
-        require(safe && glad && live);
+    function tell() public note {
+        require(safe && glad);
+        require(wards[msg.sender] == 1 || (msg.sender == owner && !live), "TinlakeManager/not-authorized");
         (uint256 ink, ) = vat.urns(ilk, address(this));
         safe = false;
         pool.redeemOrder(ink);
