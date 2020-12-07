@@ -282,7 +282,7 @@ contract TinlakeManager is LibNote {
     // --- Global settlement ---
     function take(uint endEpoch) public note ownerOnly {
         require(!live, "TinlakeManager/not-live");
-        (uint returned, , ,uint remainingDrop) = pool.disburse(endEpoch);
+        pool.disburse(endEpoch);
         dai.transfer(owner, dai.balanceOf(address(this)));
     }
 
