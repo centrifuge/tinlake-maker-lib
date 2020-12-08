@@ -2,7 +2,7 @@ pragma solidity >=0.5.12;
 
 import "ds-test/test.sol";
 import "../mgr.sol";
-import "../spell.sol";
+import {DssSpell} from "../spell.sol";
 import "lib/dss-interfaces/src/Interfaces.sol";
 import {DSValue} from "ds-value/value.sol";
 import {EpochCoordinator} from "tinlake/lender/coordinator.sol";
@@ -47,9 +47,9 @@ contract TinlakeManagerTest is DSTest {
     DaiAbstract dai;
     JugAbstract jug;
     ChainlogAbstract constant CHANGELOG = ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
-    DSChiefAbstract constant chief = DSChiefAbstract(0x9eF05f7F6deB616fd37aC3c959a2dDD25A54E4F5);
-    DSTokenAbstract constant gov   = DSTokenAbstract(0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2);
-    address constant pause_proxy = 0xBE8E3e3618f7474F8cB1d074A26afFef007E98FB;
+    DSChiefAbstract chief;
+    DSTokenAbstract gov;
+    address pause_proxy;
 
     // -- testing --
     Hevm constant hevm = Hevm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
@@ -72,6 +72,10 @@ contract TinlakeManagerTest is DSTest {
         dai = DaiAbstract(CHANGELOG.getAddress("MCD_DAI"));
         jug = JugAbstract(CHANGELOG.getAddress("MCD_JUG"));
         spotter = SpotAbstract(CHANGELOG.getAddress("MCD_SPOT"));
+        chief = DSChiefAbstract(CHANGELOG.getAddress("MCD_ADM"));
+        gov = DSTokenAbstract(CHANGELOG.getAddress("MCD_GOV"));
+        pause_proxy = CHANGELOG.getAddress("MCD_PAUSE_PROXY");
+
 
         // deploy unmodified pip
         dropPip = new DSValue();
@@ -209,6 +213,16 @@ contract TinlakeManagerTest is DSTest {
             assertTrue(!spell.done());
 
             address[] memory yays = new address[](1);
+
+            if (chief.live() == 0) {
+                yays[0] = address(0);
+                chief.vote(yays);
+                if (chief.hat() != address(0)) {
+                    chief.lift(address(0));
+                }
+                chief.launch();
+            }
+
             yays[0] = address(spell);
 
             chief.vote(yays);
