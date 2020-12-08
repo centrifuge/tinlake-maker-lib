@@ -180,7 +180,7 @@ contract TinlakeManagerTest is DSTest {
         jug.drip(ilk);
         uint preSin = vat.sin(address(vow));
         (, uint rate, , ,) = vat.ilks(ilk);
-        (uint preink, uint preart) = vat.urns(ilk, address(this));
+        (uint preink, uint preart) = vat.urns(ilk, address(dropMgr));
         dropMgr.tell();
         dropMgr.sink();
 
@@ -188,7 +188,7 @@ contract TinlakeManagerTest is DSTest {
         assertEq(vat.gem(ilk, address(dropMgr)), 400 ether);
         assertEq(preink, 400 ether);
         // the urn is empty
-        (uint postink, uint postart) = vat.urns(ilk, address(this));
+        (uint postink, uint postart) = vat.urns(ilk, address(dropMgr));
         assertEq(postink, 0);
         assertEq(postart, 0);
         // and the vow has accumulated sin
