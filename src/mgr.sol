@@ -239,8 +239,10 @@ contract TinlakeManager is LibNote {
 
         // Repay dai debt up to the full amount
         // and exit the gems used up
+        uint dart = mul(ONE, payBack) / rate;
+        require(int(dart) >= 0, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this),
-                 -int(dropReturned), -int(payBack / rate));
+                 -int(dropReturned), -int(dart));
         vat.slip(ilk, address(this), -int(dropReturned));
 
         // Return possible remainder to the owner
