@@ -217,7 +217,7 @@ contract TinlakeManagerTest is DSTest {
         assertEq(chief.hat(), address(spell));
     }
 
-    function cdptab() public returns (uint) {
+    function cdptab() public view returns (uint) {
         // Calculate DAI cdp debt
         (, uint art) = vat.urns(ilk, address(dropMgr));
         (, uint rate, , ,) = vat.ilks(ilk);
