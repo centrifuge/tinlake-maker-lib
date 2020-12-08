@@ -262,7 +262,6 @@ contract TinlakeManager is LibNote {
         tab = mul(rate, art);
         vow.fess(tab);
         glad = false;
-        safe = false; // will already be false in most situations.
     }
 
     function recover(uint endEpoch) public note {
