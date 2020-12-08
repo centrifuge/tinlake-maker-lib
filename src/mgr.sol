@@ -166,7 +166,7 @@ contract TinlakeManager is LibNote {
     // --- Vault Operation---
     // join & exit move the gem directly into/from the urn
     function join(uint wad) public ownerOnly note {
-        require(safe && glad && live);
+        require(safe && live);
         require(int(wad) >= 0, "TinlakeManager/overflow");
         gem.transferFrom(msg.sender, address(this), wad);
         vat.slip(ilk, address(this), int(wad));
@@ -174,7 +174,7 @@ contract TinlakeManager is LibNote {
     }
 
     function exit(uint wad) public ownerOnly note {
-        require(safe && glad && live);
+        require(safe && live);
         require(int(wad) >= 0, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this), -int(wad), 0);
         vat.slip(ilk, address(this), -int(wad));
@@ -183,7 +183,7 @@ contract TinlakeManager is LibNote {
 
     // draw & wipe call daiJoin.exit/join immediately
     function draw(uint wad) public ownerOnly note {
-        require(safe && glad && live);
+        require(safe && live);
         (,uint rate, , , ) = vat.ilks(ilk);
         uint dart = divup(mul(ONE, wad), rate);
         require(int(dart) >= 0, "TinlakeManager/overflow");
@@ -192,7 +192,7 @@ contract TinlakeManager is LibNote {
     }
 
     function wipe(uint wad) public ownerOnly note {
-        require(safe && glad && live);
+        require(safe && live);
         dai.transferFrom(msg.sender, address(this), wad);
         daiJoin.join(address(this), wad);
         (,uint rate, , , ) = vat.ilks(ilk);
@@ -216,7 +216,7 @@ contract TinlakeManager is LibNote {
 
     // --- Liquidation ---
     function tell() public note {
-        require(safe && glad);
+        require(safe);
         require(wards[msg.sender] == 1 || (msg.sender == owner && !live), "TinlakeManager/not-authorized");
         (uint256 ink, ) = vat.urns(ilk, address(this));
         safe = false;
