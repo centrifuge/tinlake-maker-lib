@@ -224,7 +224,7 @@ contract TinlakeManager is LibNote {
     }
 
     function unwind(uint endEpoch) public note {
-        require(glad && !safe && live, "TinlakeManager/not-soft-liquidation");
+        require(!safe && glad && live, "TinlakeManager/not-soft-liquidation");
         (uint redeemed, , ,uint remainingDrop) = pool.disburse(endEpoch);
         uint dropReturned = sub(vat.gem(ilk, address(this)), remainingDrop);
         require(int(dropReturned) >= 0, "TinlakeManager/underflow");
@@ -265,7 +265,7 @@ contract TinlakeManager is LibNote {
     }
 
     function recover(uint endEpoch) public note {
-        require(!safe && !glad && live, "TinlakeManager/not-written-off");
+        require(!glad && live, "TinlakeManager/not-written-off");
 
         (uint returned, , ,uint remainingDrop) = pool.disburse(endEpoch);
         uint dropReturned = sub(vat.gem(ilk, address(this)), remainingDrop);
