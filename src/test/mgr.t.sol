@@ -184,8 +184,7 @@ contract TinlakeManagerTest is DSTest {
         dropMgr.tell();
         dropMgr.sink();
 
-        // the manager now has vat.gems
-        assertEq(vat.gem(ilk, address(dropMgr)), 400 ether);
+        assertEq(vat.gem(ilk, address(dropMgr)), 0);
         assertEq(preink, 400 ether);
         // the urn is empty
         (uint postink, uint postart) = vat.urns(ilk, address(dropMgr));
