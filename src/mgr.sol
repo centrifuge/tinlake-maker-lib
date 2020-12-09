@@ -176,7 +176,7 @@ contract TinlakeManager is LibNote {
 
     function exit(uint wad) public ownerOnly note {
         require(safe && live);
-        require(int(wad) >= 0, "TinlakeManager/overflow");
+        require(wad <= 2 ** 255, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this), -int(wad), 0);
         vat.slip(ilk, address(this), -int(wad));
         gem.transfer(owner, wad);
@@ -198,7 +198,7 @@ contract TinlakeManager is LibNote {
         daiJoin.join(address(this), wad);
         (,uint rate, , , ) = vat.ilks(ilk);
         uint dart = mul(ONE, wad) / rate;
-        require(int(dart) >= 0, "TinlakeManager/overflow");
+        require(dart <= 2 ** 255, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this), 0, -int(dart));
     }
 
@@ -228,7 +228,7 @@ contract TinlakeManager is LibNote {
         require(!safe && glad && live, "TinlakeManager/not-soft-liquidation");
         (uint redeemed, , ,uint remainingDrop) = pool.disburse(endEpoch);
         uint dropReturned = sub(vat.gem(ilk, address(this)), remainingDrop);
-        require(int(dropReturned) >= 0, "TinlakeManager/underflow");
+        require(dropReturned <= 2 ** 255, "TinlakeManager/overflow");
 
         (, uint rate, , ,) = vat.ilks(ilk);
         (, uint art) = vat.urns(ilk, address(this));
@@ -241,7 +241,7 @@ contract TinlakeManager is LibNote {
         // Repay dai debt up to the full amount
         // and exit the gems used up
         uint dart = mul(ONE, payBack) / rate;
-        require(int(dart) >= 0, "TinlakeManager/overflow");
+        require(dart <= 2 ** 255, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this),
                  -int(dropReturned), -int(dart));
         vat.slip(ilk, address(this), -int(dropReturned));
@@ -254,8 +254,8 @@ contract TinlakeManager is LibNote {
     function sink() public note auth {
         require(!safe && glad && live);
         (uint256 ink, uint256 art) = vat.urns(ilk, address(this));
-        require(int(ink) >= 0, "TinlakeManager/underflow");
-        require(int(art) >= 0, "TinlakeManager/underflow");
+        require(ink <= 2 ** 255, "TinlakeManager/overflow");
+        require(art <= 2 ** 255, "TinlakeManager/overflow");
         (, uint rate, , ,) = vat.ilks(ilk);
         vat.grab(ilk,
                  address(this),
