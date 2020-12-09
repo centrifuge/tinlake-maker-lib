@@ -38,6 +38,7 @@ interface VowLike {
 }
 
 interface VatLike {
+    function live() external view returns (uint);
     function slip(bytes32,address,int) external;
     function flux(bytes32,address,address,uint256) external;
     function ilks(bytes32) external returns (uint,uint,uint,uint,uint);
@@ -287,7 +288,8 @@ contract TinlakeManager is LibNote {
         dai.transfer(owner, dai.balanceOf(address(this)));
     }
 
-    function cage() external note auth {
+    function cage() external note {
+        require(wards[msg.sender] == 1 || vat.live() == 0, "TinlakeManager/not-authorized");
         live = false;
     }
 }
