@@ -249,10 +249,13 @@ contract TinlakeManager is LibNote {
         // Return possible remainder to the owner
         dai.transfer(owner, dai.balanceOf(address(this)));
     }
+
     // --- Writeoff ---
     function sink() public note auth {
         require(!safe && glad && live);
         (uint256 ink, uint256 art) = vat.urns(ilk, address(this));
+        require(int(ink) >= 0, "TinlakeManager/underflow");
+        require(int(art) >= 0, "TinlakeManager/underflow");
         (, uint rate, , ,) = vat.ilks(ilk);
         vat.grab(ilk,
                  address(this),
@@ -260,6 +263,7 @@ contract TinlakeManager is LibNote {
                  address(vow),
                  -int(ink),
                  -int(art));
+        vat.slip(ilk, address(this), -int(ink));
         tab = mul(rate, art);
         vow.fess(tab);
         glad = false;
@@ -268,14 +272,9 @@ contract TinlakeManager is LibNote {
     function recover(uint endEpoch) public note {
         require(!glad && live, "TinlakeManager/not-written-off");
 
-        (uint returned, , ,uint remainingDrop) = pool.disburse(endEpoch);
-        uint dropReturned = sub(vat.gem(ilk, address(this)), remainingDrop);
+        (uint recovered, , ,) = pool.disburse(endEpoch);
 
-        require(int(dropReturned) >= 0, "TinlakeManager/underflow");
-
-        vat.slip(ilk, address(this), -int(dropReturned));
-
-        uint payBack = min(returned, tab / ONE);
+        uint payBack = min(recovered, tab / ONE);
         daiJoin.join(address(vow), payBack);
         tab = sub(tab, mul(payBack, ONE));
         dai.transfer(owner, dai.balanceOf(address(this)));
