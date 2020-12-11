@@ -1,11 +1,9 @@
-all    :; dapp build
+all: build
 clean  :; dapp clean
 update:
 	dapp update
 build: update
-	dapp build
+	dapp --use $$(which solc) build
 test: update
-	dapp test
+	dapp --use $$(which solc) test --rpc
 deploy :; dapp create TinlakeMakerLib
-
-export DAPP_SOLC_VERSION=0.5.15
