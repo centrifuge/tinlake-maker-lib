@@ -55,10 +55,6 @@ interface RedeemLike {
     function disburse(uint) external returns (uint,uint,uint,uint);
 }
 
-interface AssessorLike {
-    function calcTokenPrices() external returns (uint, uint);
-}
-
 // This contract is essentially a merge of
 // a join and a cdp-manager.
 
@@ -110,15 +106,13 @@ contract TinlakeManager is LibNote {
     GemLike      public gem;
     GemLike      public tin;
     RedeemLike   public pool;
-    AssessorLike public assessor;
 
     uint public constant dec = 18;
 
     constructor(address vat_,      address dai_,
                 address daiJoin_,  address vow_,
                 address drop_,     address pool_,
-                address tin_,      address owner_,
-                address assessor_, address tranche,
+                address owner_,    address tranche,
                 bytes32 ilk_) public {
 
         vat = VatLike(vat_);
@@ -127,9 +121,7 @@ contract TinlakeManager is LibNote {
         daiJoin = GemJoinLike(daiJoin_);
 
         gem = GemLike(drop_);
-        tin = GemLike(tin_);
         pool = RedeemLike(pool_);
-        assessor = AssessorLike(assessor_);
 
         ilk = ilk_;
         wards[msg.sender] = 1;
@@ -179,7 +171,7 @@ contract TinlakeManager is LibNote {
         require(wad <= 2 ** 255, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this), -int(wad), 0);
         vat.slip(ilk, address(this), -int(wad));
-        gem.transfer(owner, wad);
+        gem.transfer(msg.sender, wad);
     }
 
     // draw & wipe call daiJoin.exit/join immediately
@@ -189,7 +181,7 @@ contract TinlakeManager is LibNote {
         uint dart = divup(mul(ONE, wad), rate);
         require(int(dart) >= 0, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this), 0, int(dart));
-        daiJoin.exit(owner, wad);
+        daiJoin.exit(msg.sender, wad);
     }
 
     function wipe(uint wad) public ownerOnly note {
@@ -201,7 +193,6 @@ contract TinlakeManager is LibNote {
         require(dart <= 2 ** 255, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this), 0, -int(dart));
     }
-
 
     // --- Administration ---
     function setOwner(address newOwner) external ownerOnly note {
@@ -284,7 +275,7 @@ contract TinlakeManager is LibNote {
     function take(uint endEpoch) public note ownerOnly {
         require(!live, "TinlakeManager/not-live");
         pool.disburse(endEpoch);
-        dai.transfer(owner, dai.balanceOf(address(this)));
+        dai.transfer(msg.sender, dai.balanceOf(address(this)));
     }
 
     function cage() external note {

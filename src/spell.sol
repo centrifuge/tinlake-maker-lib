@@ -71,8 +71,6 @@ contract SpellAction {
         address MCD_CAT      = CHANGELOG.getAddress("MCD_CAT");
         address MCD_JUG      = CHANGELOG.getAddress("MCD_JUG");
         address MCD_SPOT     = CHANGELOG.getAddress("MCD_SPOT");
-        address MCD_END      = CHANGELOG.getAddress("MCD_END");
-        address FLIPPER_MOM  = CHANGELOG.getAddress("FLIPPER_MOM");
         address ILK_REGISTRY = CHANGELOG.getAddress("ILK_REGISTRY");
 
         // Add NS2DRP contracts to the changelog

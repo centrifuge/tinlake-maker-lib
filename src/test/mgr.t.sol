@@ -59,7 +59,6 @@ contract TinlakeManagerTest is DSTest {
 
     // Tinlake
     address constant reserve = 0x30FDE788c346aBDdb564110293B20A13cF1464B6;
-    AssessorLike constant assessor = AssessorLike(0xdA0bA5Dd06C8BaeC53Fa8ae25Ad4f19088D6375b);
     GemLike constant drop = GemLike(0xE4C72b4dE5b0F9ACcEA880Ad0b1F944F85A9dAA0);
     Root constant root = Root(0x53b2d22d07E069a3b132BfeaaD275b10273d381E);
     MemberList constant memberlist = MemberList(0x5B5CFD6E45F1407ABCb4BFD9947aBea1EA6649dA);
@@ -88,9 +87,7 @@ contract TinlakeManagerTest is DSTest {
                                      address(vow),
                                      0xE4C72b4dE5b0F9ACcEA880Ad0b1F944F85A9dAA0, // DROP token
                                      0x230f2E19D6c2Dc0c441c2150D4dD9d67B563A60C, // senior operator
-                                     0x961e1d4c9A7C0C3e05F17285f5FA34A66b62dBb1, // TIN token
                                      address(this),
-                                     0xdA0bA5Dd06C8BaeC53Fa8ae25Ad4f19088D6375b, // assessor
                                      0xfB30B47c47E2fAB74ca5b0c1561C2909b280c4E5, // senior tranche
                                      ilk);
         // cast spell
