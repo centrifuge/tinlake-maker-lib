@@ -24,10 +24,6 @@ interface MemberList {
     function updateMember(address, uint) external;
 }
 
-interface ClerkLike {
-    function activated() external returns (bool);
-}
-
 contract TinlakeManagerTest is DSTest {
     bytes32 constant ilk = "NS2DRP-A"; // New Collateral Type
     uint constant ONE = 10 ** 27;
@@ -68,9 +64,6 @@ contract TinlakeManagerTest is DSTest {
     EpochCoordinator constant coordinator = EpochCoordinator(0xD2F4ba3117c6463cB67001538041fBA898bc7a2e);
     address constant seniorOperator_ = 0x6B902D49580320779262505e346E3f9B986e99e8;
     address constant seniorTranche_ = 0xDF0c780Ae58cD067ce10E0D7cdB49e92EEe716d9;
-    ClerkLike constant clerk = ClerkLike(0xE3F80411CD0Dd02Def6AF3041DA4c6f9b87BA1D8);
-
-
 
     function setUp() public {
         vat = VatAbstract(CHANGELOG.getAddress("MCD_VAT"));
@@ -85,7 +78,7 @@ contract TinlakeManagerTest is DSTest {
 
 
         // deploy unmodified pip
-        dropPip = new DSValue();
+    dropPip = new DSValue();
         dropPip.poke(bytes32(uint(1 ether)));
 
         // deploy dropMgr
@@ -169,12 +162,7 @@ contract TinlakeManagerTest is DSTest {
         dropMgr.tell();
         // all of the drop is in the redeemer now
         assertEq(drop.balanceOf(address(dropMgr)), 0);
-        uint moin = 0;
-        if(clerk.activated()) {
-            moin = 1;
-        }
-          emit log_named_uint("moin", moin);
-          dropMgr.cdpTab();
+        dropMgr.cdpTab();
 
         coordinator.closeEpoch();
 
