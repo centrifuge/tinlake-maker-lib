@@ -1,9 +1,9 @@
 pragma solidity >=0.5.12;
 
 import "ds-test/test.sol";
-import "../mgr.sol";
+import "./mgr.sol";
 import {DssSpell} from "./ns-spell.sol";
-import "lib/dss-interfaces/src/Interfaces.sol";
+import "../../lib/dss-interfaces/src/Interfaces.sol";
 import {DSValue} from "ds-value/value.sol";
 import {EpochCoordinator} from "tinlake/lender/coordinator.sol";
 
@@ -162,10 +162,7 @@ contract TinlakeManagerTest is DSTest {
         dropMgr.tell();
         // all of the drop is in the redeemer now
         assertEq(drop.balanceOf(address(dropMgr)), 0);
-        dropMgr.cdpTab();
-
         coordinator.closeEpoch();
-
         hevm.warp(now + 2 days);
         dropMgr.unwind(coordinator.currentEpoch());
         // unwinding should unlock the 400 drop in the manager

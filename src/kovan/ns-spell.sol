@@ -17,18 +17,18 @@
 
 pragma solidity >=0.5.12;
 
-import "lib/dss-interfaces/src/dapp/DSPauseAbstract.sol";
-import "lib/dss-interfaces/src/dss/CatAbstract.sol";
-import "lib/dss-interfaces/src/dss/VowAbstract.sol";
-import "lib/dss-interfaces/src/dss/FlipperMomAbstract.sol";
-import "lib/dss-interfaces/src/dss/IlkRegistryAbstract.sol";
-import "lib/dss-interfaces/src/dss/GemJoinAbstract.sol";
-import "lib/dss-interfaces/src/dss/JugAbstract.sol";
-import "lib/dss-interfaces/src/dss/MedianAbstract.sol";
-import "lib/dss-interfaces/src/dss/OsmAbstract.sol";
-import "lib/dss-interfaces/src/dss/OsmMomAbstract.sol";
-import "lib/dss-interfaces/src/dss/SpotAbstract.sol";
-import "lib/dss-interfaces/src/dss/VatAbstract.sol";
+import "../../lib/dss-interfaces/src/dapp/DSPauseAbstract.sol";
+import "../../lib/dss-interfaces/src/dss/CatAbstract.sol";
+import "../../lib/dss-interfaces/src/dss/VowAbstract.sol";
+import "../../lib/dss-interfaces/src/dss/FlipperMomAbstract.sol";
+import "../../lib/dss-interfaces/src/dss/IlkRegistryAbstract.sol";
+import "../../lib/dss-interfaces/src/dss/GemJoinAbstract.sol";
+import "../../lib/dss-interfaces/src/dss/JugAbstract.sol";
+import "../../lib/dss-interfaces/src/dss/MedianAbstract.sol";
+import "../../lib/dss-interfaces/src/dss/OsmAbstract.sol";
+import "../../lib/dss-interfaces/src/dss/OsmMomAbstract.sol";
+import "../../lib/dss-interfaces/src/dss/SpotAbstract.sol";
+import "../../lib/dss-interfaces/src/dss/VatAbstract.sol";
 
 interface ChainlogAbstract {
     function getAddress(bytes32) external returns (address);

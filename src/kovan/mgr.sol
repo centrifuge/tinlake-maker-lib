@@ -17,7 +17,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pragma solidity >=0.5.12;
-import "./lib.sol";
+import "../lib.sol";
 
 interface GemLike {
     function decimals() external view returns (uint);
