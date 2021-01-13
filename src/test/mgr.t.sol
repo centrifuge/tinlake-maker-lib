@@ -152,23 +152,34 @@ contract TinlakeManagerTest is DSTest {
     }
 
     function testTellAndUnwind() public {
+        uint mgrBalanceDrop = 400 ether;
+        uint vaultDebt = 200 ether;
         testJoinAndDraw();
-        assertEq(drop.balanceOf(address(dropMgr)), 400 ether);
-        assertEq(divup(cdptab(), ONE), 200 ether);
-        assertEq(dai.balanceOf(address(this)), 1700 ether);
+        assertEq(drop.balanceOf(address(dropMgr)), mgrBalanceDrop);
+        assertEq(divup(cdptab(), ONE), vaultDebt);
+        uint initialDaiBalance = 1700 ether;
+        assertEq(dai.balanceOf(address(this)), initialDaiBalance);
         // we are authorized, so can call `tell()`
         // even if tellCondition is not met.
         dropMgr.tell();
         // all of the drop is in the redeemer now
         assertEq(drop.balanceOf(address(dropMgr)), 0);
         coordinator.closeEpoch();
+        AssessorLike assessor = AssessorLike(assessor_);
+        uint tokenPrice = assessor.calcSeniorTokenPrice();
         hevm.warp(now + 2 days);
+        coordinator.currentEpoch();
+
+        vaultDebt = divup(cdptab(), ONE);
         dropMgr.unwind(coordinator.currentEpoch());
         // unwinding should unlock the 400 drop in the manager
         // giving 200 to cover the cdp
         assertEq(cdptab(), 0 ether); // the cdp should now be debt free
-        // and 200 back to us
-        assertEq(dai.balanceOf(address(this)), 1900 ether);
+        // and 200 + interest back to us
+     
+        uint redeemedDrop = mul(mgrBalanceDrop, tokenPrice) / ONE;
+        uint expectedValue = sub(add(initialDaiBalance, redeemedDrop), vaultDebt);
+        assert((expectedValue - 1) <= dai.balanceOf(address(this)) && dai.balanceOf(address(this)) <= (expectedValue + 1 ));
     }
 
     function testSinkAndRecover() public {
