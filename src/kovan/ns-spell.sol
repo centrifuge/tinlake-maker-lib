@@ -44,8 +44,8 @@ contract NSSpellAction {
     ChainlogAbstract constant CHANGELOG = ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
 
     address constant NS2DRP            = 0x352Fee834a14800739DC72B219572d18618D9846; // NSDROP 
-    // address constant MCD_NS2DRP_MGR_A  = 0x65242F75e6cCBF973b15d483dD5F555d13955A1e; // NSDROP MGR
-    address constant MCD_NS2DRP_MGR_A  = 0xEcEDFd8BA8ae39a6Bd346Fe9E5e0aBeA687fFF31;
+    address constant MCD_NS2DRP_MGR_A  = 0x65242F75e6cCBF973b15d483dD5F555d13955A1e; // NSDROP MGR
+    // address constant MCD_NS2DRP_MGR_A  = 0xEcEDFd8BA8ae39a6Bd346Fe9E5e0aBeA687fFF31; // MGR address to use for test cases to pass
     address constant PIP_NS2DRP        = 0xc7a490C4268f116d5792b3ec1D7e8A1792bb70CA; // unmodified DSValue
 
     // Decimals & precision
