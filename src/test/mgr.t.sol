@@ -24,6 +24,9 @@ interface MemberList {
     function updateMember(address, uint) external;
 }
 
+interface AssessorLike {
+    function calcSeniorTokenPrice() external returns (uint);
+}
 
 contract TinlakeManagerTest is DSTest {
     bytes32 constant ilk = "NS2DRP-A"; // New Collateral Type
@@ -63,6 +66,8 @@ contract TinlakeManagerTest is DSTest {
     Root constant root = Root(0x53b2d22d07E069a3b132BfeaaD275b10273d381E);
     MemberList constant memberlist = MemberList(0x5B5CFD6E45F1407ABCb4BFD9947aBea1EA6649dA);
     EpochCoordinator constant coordinator = EpochCoordinator(0xFE860d06fF2a3A485922A6a029DFc1CD8A335288);
+    address constant assessor_ = 0xdA0bA5Dd06C8BaeC53Fa8ae25Ad4f19088D6375b;
+    
 
     function setUp() public {
         vat = VatAbstract(CHANGELOG.getAddress("MCD_VAT"));
