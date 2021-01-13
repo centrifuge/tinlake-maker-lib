@@ -214,7 +214,7 @@ contract TinlakeManager is LibNote, DSTest {
         (uint256 ink, ) = vat.urns(ilk, address(this));
         safe = false;
         emit log_named_uint("ink", ink);
-        pool.redeemOrder(10 ether);
+        pool.redeemOrder(ink);
     }
 
     function unwind(uint endEpoch) public note {
