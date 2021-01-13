@@ -24,6 +24,10 @@ interface MemberList {
     function updateMember(address, uint) external;
 }
 
+interface AssessorLike {
+    function calcSeniorTokenPrice() external returns (uint);
+}
+
 contract TinlakeManagerTest is DSTest {
     bytes32 constant ilk = "NS2DRP-A"; // New Collateral Type
     uint constant ONE = 10 ** 27;
@@ -37,7 +41,9 @@ contract TinlakeManagerTest is DSTest {
     function divup(uint x, uint y) internal pure returns (uint z) {
         z = add(x, sub(y, 1)) / y;
     }
-
+    function mul(uint x, uint y) internal pure returns (uint z) {
+        require(y == 0 || (z = x * y) / y == x);
+    }
     // MCD
     VatAbstract vat;
     CatAbstract cat;
@@ -64,7 +70,7 @@ contract TinlakeManagerTest is DSTest {
     EpochCoordinator constant coordinator = EpochCoordinator(0xB51D3cbaa5CCeEf896B96091E69be48bCbDE8367);
     address constant seniorOperator_ = 0x6B902D49580320779262505e346E3f9B986e99e8;
     address constant seniorTranche_ = 0xDF0c780Ae58cD067ce10E0D7cdB49e92EEe716d9;
-
+    address constant assessor_ = 0x49527a20904aF41d1cbFc0ba77576B9FBd8ec9E5;
     function setUp() public {
         vat = VatAbstract(CHANGELOG.getAddress("MCD_VAT"));
         vow = VowAbstract(CHANGELOG.getAddress("MCD_VOW"));
@@ -132,70 +138,81 @@ contract TinlakeManagerTest is DSTest {
         assertEq(drop.balanceOf(address(dropMgr)), 400 ether);
     }
 
-    // function testWipeAndExit() public {
-    //     testJoinAndDraw();
-    //     dropMgr.wipe(10 ether);
-    //     dropMgr.exit(10 ether);
-    //     assertEq(dai.balanceOf(address(this)), 1690 ether);
-    //     assertEq(drop.balanceOf(address(this)), 610 ether);
-    // }
+    function testWipeAndExit() public {
+        testJoinAndDraw();
+        dropMgr.wipe(10 ether);
+        dropMgr.exit(10 ether);
+        assertEq(dai.balanceOf(address(this)), 1690 ether);
+        assertEq(drop.balanceOf(address(this)), 610 ether);
+    }
 
-    // function testAccrueInterest() public {
-    //     testJoinAndDraw();
-    //     hevm.warp(now + 2 days);
-    //     jug.drip(ilk);
-    //     assertEq(cdptab() / ONE, 200.038762269592882076 ether);
-    //     dropMgr.wipe(10 ether);
-    //     dropMgr.exit(10 ether);
-    //     assertEq(cdptab() / ONE, 190.038762269592882076 ether);
-    //     assertEq(dai.balanceOf(address(this)), 1690 ether);
-    //     assertEq(drop.balanceOf(address(this)), 610 ether);
-    // }
+    function testAccrueInterest() public {
+        testJoinAndDraw();
+        hevm.warp(now + 2 days);
+        jug.drip(ilk);
+        assertEq(cdptab() / ONE, 200.038762269592882076 ether);
+        dropMgr.wipe(10 ether);
+        dropMgr.exit(10 ether);
+        assertEq(cdptab() / ONE, 190.038762269592882076 ether);
+        assertEq(dai.balanceOf(address(this)), 1690 ether);
+        assertEq(drop.balanceOf(address(this)), 610 ether);
+    }
 
     function testTellAndUnwind() public {
+        uint mgrBalanceDrop = 400 ether;
+        uint vaultDebt = 200 ether;
         testJoinAndDraw();
-        assertEq(drop.balanceOf(address(dropMgr)), 400 ether);
-        assertEq(divup(cdptab(), ONE), 200 ether);
-        assertEq(dai.balanceOf(address(this)), 1700 ether);
+        assertEq(drop.balanceOf(address(dropMgr)), mgrBalanceDrop);
+        assertEq(divup(cdptab(), ONE), vaultDebt);
+        uint initialDaiBalance = 1700 ether;
+        assertEq(dai.balanceOf(address(this)), initialDaiBalance);
         // we are authorized, so can call `tell()`
         // even if tellCondition is not met.
         dropMgr.tell();
         // all of the drop is in the redeemer now
         assertEq(drop.balanceOf(address(dropMgr)), 0);
         coordinator.closeEpoch();
+        AssessorLike assessor = AssessorLike(assessor_);
+        uint tokenPrice = assessor.calcSeniorTokenPrice();
         hevm.warp(now + 2 days);
+        coordinator.currentEpoch();
+
+        vaultDebt = divup(cdptab(), ONE);
         dropMgr.unwind(coordinator.currentEpoch());
         // unwinding should unlock the 400 drop in the manager
         // giving 200 to cover the cdp
         assertEq(cdptab(), 0 ether); // the cdp should now be debt free
-        // and 200 back to us
-        assertEq(dai.balanceOf(address(this)), 1900 ether);
+        // and 200 + interest back to us
+     
+        uint redeemedDrop = mul(mgrBalanceDrop, tokenPrice) / ONE;
+        uint expectedValue = sub(add(initialDaiBalance, redeemedDrop), vaultDebt);
+        assert( (expectedValue - 1) <= dai.balanceOf(address(this)) && dai.balanceOf(address(this)) <= (expectedValue + 1 ) );
     }
 
-    // function testSinkAndRecover() public {
-    //     testJoinAndDraw();
-    //     hevm.warp(now + 1 days);
-    //     jug.drip(ilk);
-    //     uint preSin = vat.sin(address(vow));
-    //     (, uint rate, , ,) = vat.ilks(ilk);
-    //     (uint preink, uint preart) = vat.urns(ilk, address(dropMgr));
-    //     dropMgr.tell();
-    //     dropMgr.sink();
+    function testSinkAndRecover() public {
+        testJoinAndDraw();
+        hevm.warp(now + 1 days);
+        jug.drip(ilk);
+        uint preSin = vat.sin(address(vow));
+        (, uint rate, , ,) = vat.ilks(ilk);
+        (uint preink, uint preart) = vat.urns(ilk, address(dropMgr));
+        dropMgr.tell();
+        dropMgr.sink();
 
-    //     assertEq(vat.gem(ilk, address(dropMgr)), 0);
-    //     assertEq(preink, 400 ether);
-    //     // the urn is empty
-    //     (uint postink, uint postart) = vat.urns(ilk, address(dropMgr));
-    //     assertEq(postink, 0);
-    //     assertEq(postart, 0);
-    //     // and the vow has accumulated sin
-    //     assertEq(vat.sin(address(vow)) - preSin, preart * rate);
+        assertEq(vat.gem(ilk, address(dropMgr)), 0);
+        assertEq(preink, 400 ether);
+        // the urn is empty
+        (uint postink, uint postart) = vat.urns(ilk, address(dropMgr));
+        assertEq(postink, 0);
+        assertEq(postart, 0);
+        // and the vow has accumulated sin
+        assertEq(vat.sin(address(vow)) - preSin, preart * rate);
         
-    //     // try to recover some debt
-    //     coordinator.closeEpoch();
-    //     hevm.warp(now + 2 days);
-    //     dropMgr.recover(coordinator.currentEpoch());
-    // }
+        // try to recover some debt
+        coordinator.closeEpoch();
+        hevm.warp(now + 2 days);
+        dropMgr.recover(coordinator.currentEpoch());
+    }
 
     function vote() private {
         if (chief.hat() != address(spell)) {
