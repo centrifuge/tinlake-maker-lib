@@ -41,6 +41,9 @@ contract TinlakeManagerTest is DSTest {
     function divup(uint x, uint y) internal pure returns (uint z) {
         z = add(x, sub(y, 1)) / y;
     }
+    function mul(uint x, uint y) internal pure returns (uint z) {
+        require(y == 0 || (z = x * y) / y == x);
+    }
 
     // MCD
     VatAbstract vat;
