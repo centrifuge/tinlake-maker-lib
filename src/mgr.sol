@@ -18,6 +18,7 @@
 
 pragma solidity >=0.5.12;
 import "./lib.sol";
+import "ds-test/test.sol";
 
 interface GemLike {
     function decimals() external view returns (uint);
@@ -70,7 +71,7 @@ interface RedeemLike {
 // not only DROP as an ERC20 balance in this contract, but also what's currently
 // undergoing redemption from the Tinlake pool.
 
-contract TinlakeManager is LibNote {
+contract TinlakeManager is LibNote, DSTest {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address usr) external note auth { require(live, "TinlakeMgr/not-live"); wards[usr] = 1; }
@@ -212,7 +213,8 @@ contract TinlakeManager is LibNote {
         require(wards[msg.sender] == 1 || (msg.sender == owner && !live), "TinlakeManager/not-authorized");
         (uint256 ink, ) = vat.urns(ilk, address(this));
         safe = false;
-        pool.redeemOrder(ink);
+        emit log_named_uint("ink", ink);
+        pool.redeemOrder(10 ether);
     }
 
     function unwind(uint endEpoch) public note {

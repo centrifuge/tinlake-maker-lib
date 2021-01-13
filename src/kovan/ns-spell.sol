@@ -35,7 +35,7 @@ interface ChainlogAbstract {
     function setAddress(bytes32, address) external;
 }
 
-contract SpellAction {
+contract NSSpellAction {
     // KOVAN ADDRESSES
     //
     // The contracts in this list should correspond to MCD core contracts, verify
@@ -44,7 +44,8 @@ contract SpellAction {
     ChainlogAbstract constant CHANGELOG = ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
 
     address constant NS2DRP            = 0x352Fee834a14800739DC72B219572d18618D9846; // NSDROP 
-    address constant MCD_NS2DRP_MGR_A  = 0xEcEDFd8BA8ae39a6Bd346Fe9E5e0aBeA687fFF31; // NSDROP MGR
+    // address constant MCD_NS2DRP_MGR_A  = 0x65242F75e6cCBF973b15d483dD5F555d13955A1e; // NSDROP MGR
+    address constant MCD_NS2DRP_MGR_A  = 0xEcEDFd8BA8ae39a6Bd346Fe9E5e0aBeA687fFF31;
     address constant PIP_NS2DRP        = 0xc7a490C4268f116d5792b3ec1D7e8A1792bb70CA; // unmodified DSValue
 
     // Decimals & precision
@@ -129,14 +130,12 @@ contract DssSpell {
     bool            public done;
 
     // Provides a descriptive tag for bot consumption
-    // This should be modified weekly to provide a summary of the actions
-    // Hash: seth keccak -- "$(wget https://raw.githubusercontent.com/makerdao/community/a67032a357000839ae08c7523abcf9888c8cca3a/governance/votes/Executive%20vote%20-%20November%2013%2C%202020.md -q -O - 2>/dev/null)"
     string constant public description =
-        "2020-11-13 MakerDAO Executive Spell | Hash: 0xa2b54a94b44575d01239378e48f966c4e583b965172be0a8c4b59b74523683ff";
+        "2021-01-11 NS-INTEGRATION SPELL";
 
     constructor() public {
         sig = abi.encodeWithSignature("execute()");
-        action = address(new SpellAction());
+        action = address(new NSSpellAction());
         bytes32 _tag;
         address _action = action;
         assembly { _tag := extcodehash(_action) }
