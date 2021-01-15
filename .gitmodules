@@ -1,6 +1,3 @@
-[submodule "lib/tinlake"]
-	path = lib/tinlake
-	url = https://github.com/centrifuge/tinlake
 [submodule "lib/dss-interfaces"]
 	path = lib/dss-interfaces
 	url = https://github.com/makerdao/dss-interfaces
