@@ -45,7 +45,7 @@ contract TinlakeManagerTest is DSTest {
         require(y == 0 || (z = x * y) / y == x);
     }
 
-//     MCD
+    // MCD
     VatAbstract vat;
     CatAbstract cat;
     VowAbstract vow;
@@ -57,13 +57,13 @@ contract TinlakeManagerTest is DSTest {
     DSTokenAbstract gov;
     address pause_proxy;
 
-//     -- testing --
+    //  -- testing --
     Hevm constant hevm = Hevm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
     DssSpell spell;
     TinlakeManager dropMgr;
     DSValue dropPip;
 
-//     Tinlake
+    // Tinlake
     address constant reserve = 0x30FDE788c346aBDdb564110293B20A13cF1464B6;
     GemLike constant drop = GemLike(0xE4C72b4dE5b0F9ACcEA880Ad0b1F944F85A9dAA0);
     Root constant root = Root(0x53b2d22d07E069a3b132BfeaaD275b10273d381E);
@@ -84,11 +84,11 @@ contract TinlakeManagerTest is DSTest {
         pause_proxy = CHANGELOG.getAddress("MCD_PAUSE_PROXY");
 
 
-        deploy unmodified pip
+        // deploy unmodified pip
         dropPip = new DSValue();
         dropPip.poke(bytes32(uint(1 ether)));
 
-        deploy dropMgr
+        // deploy dropMgr
         dropMgr = new TinlakeManager(address(vat),
                                      CHANGELOG.getAddress("MCD_DAI"),
                                      CHANGELOG.getAddress("MCD_JOIN_DAI"),
@@ -98,7 +98,7 @@ contract TinlakeManagerTest is DSTest {
                                      address(this),
                                      0xfB30B47c47E2fAB74ca5b0c1561C2909b280c4E5, // senior tranche
                                      ilk);
-        cast spell
+        // cast spell
         spell = new DssSpell();
         vote();
         spell.schedule();
@@ -106,20 +106,19 @@ contract TinlakeManagerTest is DSTest {
         spell.cast();
         jug.drip(ilk);
 
-        welcome to hevm KYC
+        // welcome to hevm KYC
         hevm.store(address(root), keccak256(abi.encode(address(this), uint(0))), bytes32(uint(1)));
         root.relyContract(address(memberlist), address(this));
         memberlist.updateMember(address(this), uint(-1));
-
         memberlist.updateMember(address(dropMgr), uint(-1));
 
-        give this address 1500 dai and 1000 drop
+        // give this address 1500 dai and 1000 drop
         hevm.store(address(dai), keccak256(abi.encode(address(this), uint(2))), bytes32(uint(1500 ether)));
         hevm.store(address(drop), keccak256(abi.encode(address(this), uint(8))), bytes32(uint(1000 ether)));
         assertEq(dai.balanceOf(address(this)), 1500 ether);
         assertEq(drop.balanceOf(address(this)), 1000 ether);
 
-        approve the manager
+        // approve the manager
         drop.approve(address(dropMgr), uint(-1));
         dai.approve(address(dropMgr), uint(-1));
     }
@@ -166,10 +165,10 @@ contract TinlakeManagerTest is DSTest {
         assertEq(divup(cdptab(), ONE), vaultDebt);
         uint initialDaiBalance = 1700 ether;
         assertEq(dai.balanceOf(address(this)), initialDaiBalance);
-        we are authorized, so can call `tell()`
-        even if tellCondition is not met.
+        // we are authorized, so can call `tell()`
+        // even if tellCondition is not met.
         dropMgr.tell();
-        all of the drop is in the redeemer now
+        // all of the drop is in the redeemer now
         assertEq(drop.balanceOf(address(dropMgr)), 0);
         coordinator.closeEpoch();
         AssessorLike assessor = AssessorLike(assessor_);
@@ -179,10 +178,10 @@ contract TinlakeManagerTest is DSTest {
 
         vaultDebt = divup(cdptab(), ONE);
         dropMgr.unwind(coordinator.currentEpoch());
-        unwinding should unlock the 400 drop in the manager
-        giving 200 to cover the cdp
+        // unwinding should unlock the 400 drop in the manager
+        // giving 200 to cover the cdp
         assertEq(cdptab(), 0 ether); // the cdp should now be debt free
-        and 200 + interest back to us
+        // and 200 + interest back to us
      
         uint redeemedDrop = mul(mgrBalanceDrop, tokenPrice) / ONE;
         uint expectedValue = sub(add(initialDaiBalance, redeemedDrop), vaultDebt);
@@ -201,14 +200,14 @@ contract TinlakeManagerTest is DSTest {
 
         assertEq(vat.gem(ilk, address(dropMgr)), 0);
         assertEq(preink, 400 ether);
-        the urn is empty
+        // the urn is empty
         (uint postink, uint postart) = vat.urns(ilk, address(dropMgr));
         assertEq(postink, 0);
         assertEq(postart, 0);
-        and the vow has accumulated sin
+        // and the vow has accumulated sin
         assertEq(vat.sin(address(vow)) - preSin, preart * rate);
         
-        try to recover some debt
+        // try to recover some debt
         coordinator.closeEpoch();
         hevm.warp(now + 2 days);
         dropMgr.recover(coordinator.currentEpoch());
@@ -246,7 +245,7 @@ contract TinlakeManagerTest is DSTest {
     }
 
     function cdptab() public view returns (uint) {
-        Calculate DAI cdp debt
+        //  Calculate DAI cdp debt
         (, uint art) = vat.urns(ilk, address(dropMgr));
         (, uint rate, , ,) = vat.ilks(ilk);
         return art * rate;
