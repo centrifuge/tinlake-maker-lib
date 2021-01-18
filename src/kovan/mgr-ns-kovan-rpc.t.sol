@@ -57,7 +57,7 @@ contract TinlakeManagerTest is DSTest {
     DSTokenAbstract gov;
     address pause_proxy;
 
-    // -- testing --
+    // -- testing --                 
     Hevm constant hevm = Hevm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
     DssSpell spell;
     TinlakeManager dropMgr;
@@ -66,11 +66,13 @@ contract TinlakeManagerTest is DSTest {
     // Tinlake
     GemLike constant drop = GemLike(0x352Fee834a14800739DC72B219572d18618D9846);
     Root constant root = Root(0x25dF507570c8285E9c8E7FFabC87db7836850dCd);
+    address constant MCD_NS2DRP_MGR_A  = 0x65242F75e6cCBF973b15d483dD5F555d13955A1e; // NSDROP MGR
     MemberList constant memberlist = MemberList(0xD927F069faf59eD83A1072624Eeb794235bBA652);
     EpochCoordinator constant coordinator = EpochCoordinator(0xB51D3cbaa5CCeEf896B96091E69be48bCbDE8367);
     address constant seniorOperator_ = 0x6B902D49580320779262505e346E3f9B986e99e8;
     address constant seniorTranche_ = 0xDF0c780Ae58cD067ce10E0D7cdB49e92EEe716d9;
     address constant assessor_ = 0x49527a20904aF41d1cbFc0ba77576B9FBd8ec9E5;
+
     function setUp() public {
         vat = VatAbstract(CHANGELOG.getAddress("MCD_VAT"));
         vow = VowAbstract(CHANGELOG.getAddress("MCD_VOW"));
@@ -82,21 +84,12 @@ contract TinlakeManagerTest is DSTest {
         gov = DSTokenAbstract(CHANGELOG.getAddress("MCD_GOV"));
         pause_proxy = CHANGELOG.getAddress("MCD_PAUSE_PROXY");
 
-
         // deploy unmodified pip
         dropPip = new DSValue();
         dropPip.poke(bytes32(uint(1 ether)));
 
-        // deploy dropMgr
-        dropMgr = new TinlakeManager(address(vat),
-                                     CHANGELOG.getAddress("MCD_DAI"),
-                                     CHANGELOG.getAddress("MCD_JOIN_DAI"),
-                                     address(vow),
-                                     address(drop),
-                                     seniorOperator_,
-                                     address(this),
-                                     seniorTranche_,
-                                     ilk);
+        dropMgr = TinlakeManager(MCD_NS2DRP_MGR_A);
+
         // cast spell
         spell = new DssSpell();
         vote();
@@ -107,11 +100,16 @@ contract TinlakeManagerTest is DSTest {
 
         // welcome to hevm KYC
         hevm.store(address(root), keccak256(abi.encode(address(this), uint(0))), bytes32(uint(1)));
+
         root.relyContract(address(memberlist), address(this));
         memberlist.updateMember(address(this), uint(-1));
 
-        memberlist.updateMember(address(dropMgr), uint(-1));
-
+        // set this contract as owner of dropMgr // override slot 1
+        // check what's inside slot 1 with: bytes32 slot = hevm.load(address(dropMgr), bytes32(uint(1)));
+        hevm.store(address(dropMgr), bytes32(uint(1)), bytes32(0x0000000000000000000101013bE95e4159a131E56A84657c4ad4D43eC7Cd865d));
+        // ste this contract as ward on the mgr
+        hevm.store(address(dropMgr), keccak256(abi.encode(address(this), uint(0))), bytes32(uint(1)));
+        assertEq(dropMgr.owner(), address(this));
         // give this address 1500 dai and 1000 drop
         hevm.store(address(dai), keccak256(abi.encode(address(this), uint(2))), bytes32(uint(1500 ether)));
         hevm.store(address(drop), keccak256(abi.encode(address(this), uint(8))), bytes32(uint(1000 ether)));
@@ -121,7 +119,6 @@ contract TinlakeManagerTest is DSTest {
         // approve the manager
         drop.approve(address(dropMgr), uint(-1));
         dai.approve(address(dropMgr), uint(-1));
-
     }
 
     function testSanity() public {
@@ -131,6 +128,7 @@ contract TinlakeManagerTest is DSTest {
     function testJoinAndDraw() public {
         assertEq(dai.balanceOf(address(this)), 1500 ether);
         assertEq(drop.balanceOf(address(this)), 1000 ether);
+
         dropMgr.join(400 ether);
         dropMgr.draw(200 ether);
         assertEq(dai.balanceOf(address(this)), 1700 ether);
@@ -186,7 +184,7 @@ contract TinlakeManagerTest is DSTest {
      
         uint redeemedDrop = mul(mgrBalanceDrop, tokenPrice) / ONE;
         uint expectedValue = sub(add(initialDaiBalance, redeemedDrop), vaultDebt);
-        assert( (expectedValue - 1) <= dai.balanceOf(address(this)) && dai.balanceOf(address(this)) <= (expectedValue + 1 ) );
+        assert((expectedValue - 1) <= dai.balanceOf(address(this)) && dai.balanceOf(address(this)) <= (expectedValue + 1 ));
     }
 
     function testSinkAndRecover() public {
