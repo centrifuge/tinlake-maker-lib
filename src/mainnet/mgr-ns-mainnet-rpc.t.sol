@@ -45,7 +45,7 @@ contract TinlakeManagerTest is DSTest {
         require(y == 0 || (z = x * y) / y == x);
     }
 
-    MCD
+//     MCD
     VatAbstract vat;
     CatAbstract cat;
     VowAbstract vow;
@@ -57,13 +57,13 @@ contract TinlakeManagerTest is DSTest {
     DSTokenAbstract gov;
     address pause_proxy;
 
-    -- testing --
+//     -- testing --
     Hevm constant hevm = Hevm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
     DssSpell spell;
     TinlakeManager dropMgr;
     DSValue dropPip;
 
-    Tinlake
+//     Tinlake
     address constant reserve = 0x30FDE788c346aBDdb564110293B20A13cF1464B6;
     GemLike constant drop = GemLike(0xE4C72b4dE5b0F9ACcEA880Ad0b1F944F85A9dAA0);
     Root constant root = Root(0x53b2d22d07E069a3b132BfeaaD275b10273d381E);
@@ -122,7 +122,6 @@ contract TinlakeManagerTest is DSTest {
         approve the manager
         drop.approve(address(dropMgr), uint(-1));
         dai.approve(address(dropMgr), uint(-1));
-
     }
 
     function testSanity() public {
