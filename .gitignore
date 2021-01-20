@@ -1,3 +1,4 @@
 hevm.cache.*
 hevm.lib*
 /out
+.DS_Store
