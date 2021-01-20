@@ -217,7 +217,7 @@ contract TinlakeManagerUnitTest is DSTest {
     }
 
     function testFailExitNotSafe(uint128 wad) public {
-        // set live to false
+        // set safe to false
         tell();
         testExit(wad);
     }
@@ -225,6 +225,7 @@ contract TinlakeManagerUnitTest is DSTest {
     function testFailExitOverflow(uint128 wad) public {
         // join collateral
         testJoin(wad);
+        // produce overflow
         exit(uint(-1));
     }
 
