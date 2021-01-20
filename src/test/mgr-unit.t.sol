@@ -272,6 +272,7 @@ contract TinlakeManagerUnitTest is DSTest {
     }
 
     function testFailJoinSenderHasNoCollateralApproval(uint128 wad) public {
+        // for 0 not approval is required
         assert(wad > 0);
         // wad = 100 ether;
         // mint collateral for test contract
