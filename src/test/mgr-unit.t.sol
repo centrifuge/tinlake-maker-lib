@@ -7,6 +7,8 @@ import { TrancheMock } from "../../lib/tinlake/src/lender/test/mock/tranche.sol"
 import { OperatorMock } from "./mocks/tinlake/operator.sol";
 import { SimpleToken } from "../../lib/tinlake/src/test/simple/token.sol";
 import { VatMock } from "./mocks/vat.sol";
+import { DaiJoinMock } from "./mocks/daijoin.sol";
+import { SpotterMock } from "./mocks/spotter.sol";
 import { Dai } from "dss/dai.sol";
 
 interface Hevm {
@@ -38,8 +40,8 @@ contract TinlakeManagerUnitTest is DSTest {
     }
 
     // Maker
-    VatMock daiJoin;
-    VatMock spotter;
+    DaiJoinMock daiJoin;
+    SpotterMock spotter;
     VowMock vow;
     VatMock vat;
     Dai dai;
@@ -94,9 +96,9 @@ contract TinlakeManagerUnitTest is DSTest {
         dai_ = address(dai);
         vat = new VatMock();
         vat_ = address(vat);
-        daiJoin = new VatMock(); // TODO
+        daiJoin = new DaiJoinMock(); 
         daiJoin_ = address(daiJoin);
-        spotter = new VatMock(); // TODO
+        spotter = new SpotterMock();
         vow = new VowMock();
         vow_ = address(vow);
         self = address(this);
@@ -157,6 +159,10 @@ contract TinlakeManagerUnitTest is DSTest {
         assertEq(mgr.owner(), random_);
     }
 
+    function testCage() public {
+        cage();
+    }
+
     function testCageVatNotlive() public {
         // revoke access permissions from self
         mgr.deny(self);
@@ -192,7 +198,10 @@ contract TinlakeManagerUnitTest is DSTest {
     }
 
     function testFailTellNotLive() public {
+        // set live to false
         cage();
+        // revoke access permissions from self
+        mgr.deny(self);
         mgr.tell();
     }
 
@@ -202,7 +211,7 @@ contract TinlakeManagerUnitTest is DSTest {
     }
 
     function testJoin(uint128 wad) public {
-       // wad = 100 ether;
+        // wad = 100 ether;
         // mint collateral for test contract
         drop.mint(self, wad);
         // approve mgr to take collateral
@@ -212,37 +221,76 @@ contract TinlakeManagerUnitTest is DSTest {
         join(wad);
     }
 
-    function testFailJoinNotLive() public {
-
+    function testFailJoinNotLive(uint128 wad) public {
+        // wad = 100 ether;
+        // mint collateral for test contract
+        drop.mint(self, wad);
+        // approve mgr to take collateral
+        drop.approve(mgr_, wad);
+        // setup vat permissions
+        vat.rely(mgr_);
+        // set live to false
+        testCage();
+        join(wad);
     }
 
-    function testFailJoinNotSafe() public {
-
+    function testFailJoinNotSafe(uint128 wad) public {
+        // wad = 100 ether;
+        // mint collateral for test contract
+        drop.mint(self, wad);
+        // approve mgr to take collateral
+        drop.approve(mgr_, wad);
+        // setup vat permissions
+        vat.rely(mgr_);
+        // set live to false
+        testTell();
+        join(wad);
     }
 
-    function testFailJoinNegativeAmount() public {
-
+    // use uint256 as input to generate an overflow 
+    function testFailJoinOverflow() public {
+        uint wad = uint(-1);
+        // mint collateral for test contract
+        drop.mint(self, wad);
+        // approve mgr to take collateral
+        drop.approve(mgr_, wad);
+        // setup vat permissions
+        vat.rely(mgr_);
+        join(wad);
     }
 
-    function testFailJoinSenderHasNotEnoughCollateral() public {
-
+    function testFailJoinSenderHasNotEnoughCollateral(uint128 wad) public {
+        // wad = 100 ether;
+        // mint collateral for test contract
+        uint collateralBalance = sub(wad, 1);
+        drop.mint(self, collateralBalance);
+        // approve mgr to take collateral
+        drop.approve(mgr_, collateralBalance);
+        // setup vat permissions
+        vat.rely(mgr_);
+        join(wad);
     }
 
-    function testFailJoinSenderHasNoCollateralApproval() public {
-
+    function testFailJoinSenderHasNoCollateralApproval(uint128 wad) public {
+        assert(wad > 0);
+        // wad = 100 ether;
+        // mint collateral for test contract
+        drop.mint(self, wad);
+        // setup vat permissions
+        vat.rely(mgr_);
+        join(wad);
     }
 
-    function testFailJoinNoVatAuth() public {
-
+    function testFailJoinNoVatAuth(uint128 wad) public {
+        // wad = 100 ether;
+        // mint collateral for test contract
+        drop.mint(self, wad);
+        // approve mgr to take collateral
+        drop.approve(mgr_, wad);
+        // setup vat permissions
+        vat.rely(mgr_);
+        // revoke mgr auth from vat
+        vat.deny(mgr_);
+        join(wad);
     }
-
-    function testSetOwner() public {}
-    function testMigrate() public {}
-    function testDraw() public {}
-    function testWipe() public {}
-    function testExit() public {}
-    function testUnwind() public {}
-    function testSink() public {}
-    function testRecover() public {}
-    function testTake() public {}
 }

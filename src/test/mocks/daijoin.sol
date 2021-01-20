@@ -16,18 +16,13 @@
 pragma solidity >=0.5.15 <0.6.0;
 import "ds-test/test.sol";
 
-import "../../../../lib/tinlake/src/test/mock/mock.sol";
-import "./../auth.sol";
+import "../../../lib/tinlake/src/test/mock/mock.sol";
+import "./auth.sol";
 
 
-contract OperatorMock is Mock, Auth {
+contract DaiJoinMock is Mock, Auth {
 
     constructor() public {
         wards[msg.sender] = 1;
-    }
-
-    function redeemOrder(uint wad) public {
-        calls["redeemOrder"]++;
-        values_uint["redeemOrder_wad"] = wad;
     }
 }
