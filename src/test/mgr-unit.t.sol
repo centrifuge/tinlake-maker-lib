@@ -38,6 +38,11 @@ contract TinlakeManagerUnitTest is DSTest {
     function mul(uint x, uint y) internal pure returns (uint z) {
         require(y == 0 || (z = x * y) / y == x);
     }
+    function div(uint256 x, uint256 y) internal pure returns (uint256) {
+        require(y > 0, "SafeMath: division by zero");
+        uint256 z = x / y;
+        return z;
+    }
 
     // Maker
     DaiJoinMock daiJoin;
@@ -159,6 +164,70 @@ contract TinlakeManagerUnitTest is DSTest {
         assertEq(mgr.owner(), random_);
     }
 
+    function exit(uint wad) public {
+        uint mgrBalanceDROP = drop.balanceOf(mgr_);
+        uint selfBalanceDROP = drop.balanceOf(self);
+
+        mgr.exit(wad);
+        vat.setInk(sub(mgrBalanceDROP, wad)); // helper 
+
+        // assert collateral was transferred correctly from mgr
+        assertEq(drop.balanceOf(mgr_), sub(mgrBalanceDROP, wad));
+        assertEq(drop.balanceOf(self), add(selfBalanceDROP, wad));
+
+
+         // assert slip was called with correct values
+        assertEq(vat.calls("slip"), 2); // 1 call on join + 1 call on exit
+        assertEq(vat.values_address("slip_usr"), mgr_); 
+        assertEq(vat.values_bytes32("slip_ilk"), mgr.ilk());
+        assertEq(vat.values_int("slip_wad"), -int(wad));
+        
+        // assert frob was called with correct values
+        assertEq(vat.calls("frob"), 2); // 1 call on join + 1 call on exit
+        assertEq(vat.values_bytes32("frob_i"), mgr.ilk()); 
+        assertEq(vat.values_address("frob_u"), mgr_); 
+        assertEq(vat.values_address("frob_v"), mgr_); 
+        assertEq(vat.values_address("frob_w"), mgr_); 
+        assertEq(vat.values_int("frob_dink"), -int(wad)); 
+        assertEq(vat.values_int("frob_dart"), 0); 
+    }
+
+    function testExit(uint128 wad) public {
+        // join collateral
+        testJoin(wad);
+        exit(wad);
+    }
+
+    function testPartialExit(uint128 wad) public {
+        testJoin(wad);
+        exit(div(wad, 2));
+    }
+
+    function testFailExitCollateralAmountTooHigh(uint128 wad) public {
+        // join collateral
+        testJoin(wad);
+        // try to exit more then available
+        exit(add(wad, 1));
+    }
+    
+    function testFailExitNotLive(uint128 wad) public {
+        // set live to false
+        cage();
+        testExit(wad);
+    }
+
+    function testFailExitNotSafe(uint128 wad) public {
+        // set live to false
+        tell();
+        testExit(wad);
+    }
+
+    function testFailExitOverflow(uint128 wad) public {
+        // join collateral
+        testJoin(wad);
+        exit(uint(-1));
+    }
+
     function testCage() public {
         cage();
     }
@@ -222,29 +291,13 @@ contract TinlakeManagerUnitTest is DSTest {
     }
 
     function testFailJoinNotLive(uint128 wad) public {
-        // wad = 100 ether;
-        // mint collateral for test contract
-        drop.mint(self, wad);
-        // approve mgr to take collateral
-        drop.approve(mgr_, wad);
-        // setup vat permissions
-        vat.rely(mgr_);
-        // set live to false
         testCage();
-        join(wad);
+        testJoin(wad);
     }
 
     function testFailJoinNotSafe(uint128 wad) public {
-        // wad = 100 ether;
-        // mint collateral for test contract
-        drop.mint(self, wad);
-        // approve mgr to take collateral
-        drop.approve(mgr_, wad);
-        // setup vat permissions
-        vat.rely(mgr_);
-        // set live to false
-        testTell();
-        join(wad);
+         testTell();
+         testJoin(wad);
     }
 
     // use uint256 as input to generate an overflow 
@@ -259,7 +312,7 @@ contract TinlakeManagerUnitTest is DSTest {
         join(wad);
     }
 
-    function testFailJoinSenderHasNotEnoughCollateral(uint128 wad) public {
+    function testFailJoinCollateralAmountTooHigh(uint128 wad) public {
         // wad = 100 ether;
         // mint collateral for test contract
         uint collateralBalance = sub(wad, 1);
@@ -271,7 +324,7 @@ contract TinlakeManagerUnitTest is DSTest {
         join(wad);
     }
 
-    function testFailJoinSenderHasNoCollateralApproval(uint128 wad) public {
+    function testFailJoinNoApproval(uint128 wad) public {
         // for 0 not approval is required
         assert(wad > 0);
         // wad = 100 ether;
