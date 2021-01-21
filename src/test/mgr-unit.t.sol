@@ -1,6 +1,6 @@
 pragma solidity >=0.5.12;
 
-import "ds-test/test.sol";
+
 import "../mgr.sol";
  import {Mock} from "../../lib/tinlake/src/test/mock/mock.sol";
 import { TrancheMock } from "../../lib/tinlake/src/lender/test/mock/tranche.sol";
@@ -10,6 +10,7 @@ import { VatMock } from "./mocks/vat.sol";
 import { DaiJoinMock } from "./mocks/daijoin.sol";
 import { SpotterMock } from "./mocks/spotter.sol";
 import { Dai } from "dss/dai.sol";
+import "ds-test/test.sol";
 
 interface Hevm {
     function warp(uint) external;
@@ -70,6 +71,7 @@ contract TinlakeManagerUnitTest is DSTest {
 
     // -- testing --                 
     Hevm constant hevm = Hevm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
+    uint rate;
 
     function setUp() public {
         mkrDeploy();        
@@ -101,13 +103,15 @@ contract TinlakeManagerUnitTest is DSTest {
         dai_ = address(dai);
         vat = new VatMock();
         vat_ = address(vat);
-        daiJoin = new DaiJoinMock(); 
+        daiJoin = new DaiJoinMock(dai_); 
         daiJoin_ = address(daiJoin);
         spotter = new SpotterMock();
         vow = new VowMock();
         vow_ = address(vow);
         self = address(this);
 
+        // setup permissions
+        dai.rely(daiJoin_);
     }
 
     function join(uint wad) public {
@@ -190,6 +194,104 @@ contract TinlakeManagerUnitTest is DSTest {
         assertEq(vat.values_address("frob_w"), mgr_); 
         assertEq(vat.values_int("frob_dink"), -int(wad)); 
         assertEq(vat.values_int("frob_dart"), 0); 
+    }
+
+    function draw(uint wad) public {
+        uint selfBalanceDAI = dai.balanceOf(self);
+
+        mgr.draw(wad);
+        
+        // chack DAI were minted
+        assertEq(dai.balanceOf(self), add(selfBalanceDAI, wad));
+
+        // assert frob was called with correct values
+        assertEq(vat.calls("frob"), 1);
+        assertEq(vat.values_bytes32("frob_i"), mgr.ilk()); 
+        assertEq(vat.values_address("frob_u"), mgr_); 
+        assertEq(vat.values_address("frob_v"), mgr_); 
+        assertEq(vat.values_address("frob_w"), mgr_); 
+        assertEq(vat.values_int("frob_dink"), 0); 
+        assertEq(vat.values_int("frob_dart"), int(wad)); 
+    }
+
+    function wipe(uint wad) public {
+        uint selfBalanceDAI = dai.balanceOf(self);
+        uint mgrBalanceDAI = dai.balanceOf(mgr_);
+
+        mgr.wipe(wad);
+
+         // chack DAI were minted
+        assertEq(dai.balanceOf(self), sub(selfBalanceDAI, wad));
+        assertEq(dai.balanceOf(mgr_), add(mgrBalanceDAI, wad));
+
+        // assert frob was called with correct values
+        assertEq(vat.calls("frob"), 2); // 1 call on draw &  1 call on wipe
+        assertEq(vat.values_bytes32("frob_i"), mgr.ilk()); 
+        assertEq(vat.values_address("frob_u"), mgr_); 
+        assertEq(vat.values_address("frob_v"), mgr_); 
+        assertEq(vat.values_address("frob_w"), mgr_); 
+        assertEq(vat.values_int("frob_dink"), 0); 
+        assertEq(vat.values_int("frob_dart"), -int(wad)); 
+
+    }
+
+    function testWipe(uint128 wad) public {
+        testDraw(wad);
+        dai.approve(mgr_, wad);
+        wipe(wad);
+    }
+
+    function testFailWipeNotLive(uint128 wad) public {
+        // set live to false
+        cage();
+        testWipe(wad);
+    }
+
+    function testFailWipeNotSafe(uint128 wad) public {
+        // set safe to false
+        tell();
+        testWipe(wad);
+        
+    }
+
+    function testFailWipeNotEnoughDAI(uint128 wad) public {
+       assert(wad > 0);
+        testDraw(wad - 1);
+        dai.approve(mgr_, wad);
+        wipe(wad);
+    }
+
+    function testFailWipeNoDAIApproval(uint128 wad) public {
+        testDraw(wad);
+        wipe(wad);
+    }
+
+    function testFailWipeOverflow(uint wad) public {
+        dai.mint(self, uint(-1)); // mint enough funds for the account
+        assert(wad >= 2 ** 255); // wad value has to cause overflow
+        dai.approve(mgr_, wad);
+        draw(wad);
+    }
+
+    function testDraw(uint128 wad) public {
+        draw(wad);
+    }
+
+    function testFailDrawNotLive(uint128 wad) public {
+         // set live to false
+        cage();
+        testDraw(wad);
+    }
+
+    function testFailDrawNotSafe(uint128 wad) public {
+         // set safe to false
+        tell();
+        testDraw(wad);
+    }
+
+    function testFailDrawOverflow(uint wad) public {
+        assert(wad >= 2 ** 255); // wad value has to cause overflow
+        draw(wad);
     }
 
     function testExit(uint128 wad) public {

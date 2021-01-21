@@ -23,7 +23,11 @@ contract VatMock is Mock, Auth {
     constructor() public {
         wards[msg.sender] = 1;
         values_uint["live"] = 1;
+        values_uint["rate"] = 10 ** 27;
+    }
 
+    function ilks(bytes32) external view returns(uint, uint, uint, uint, uint)  {
+        return(0, values_uint["rate"], 0, 0, 0);
     }
 
     function urns(bytes32, address) external returns (uint, uint) {
@@ -60,9 +64,8 @@ contract VatMock is Mock, Auth {
 
     // unit test helpers
     function setLive(uint live) external {
-        emit log_named_uint("haha", 100);
         values_uint["live"] = live;
-    }
+    } 
 
     // unit test helpers
     function setInk(uint wad) external {

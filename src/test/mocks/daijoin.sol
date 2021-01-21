@@ -17,12 +17,25 @@ pragma solidity >=0.5.15 <0.6.0;
 import "ds-test/test.sol";
 
 import "../../../lib/tinlake/src/test/mock/mock.sol";
+import { Dai } from "dss/dai.sol";
 import "./auth.sol";
 
 
 contract DaiJoinMock is Mock, Auth {
 
-    constructor() public {
+    Dai dai;
+
+    constructor(address dai_) public {
         wards[msg.sender] = 1;
+        dai = Dai(dai_);
+    }
+
+    function join(address usr, uint wad) external {
+        calls["join"]++;    
+        values_uint["join_wad"] = wad;
+    }
+
+    function exit(address usr, uint wad) external {
+        dai.mint(usr, wad);
     }
 }
