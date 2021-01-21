@@ -44,6 +44,9 @@ contract TinlakeManagerUnitTest is DSTest {
         uint256 z = x / y;
         return z;
     }
+    function min(uint x, uint y) internal pure returns (uint z) {
+        z = x > y ? y : x;
+    }
 
     // Maker
     DaiJoinMock daiJoin;
@@ -79,7 +82,7 @@ contract TinlakeManagerUnitTest is DSTest {
         drop_ = address(drop);
         seniorTranche = new TrancheMock();
         seniorTranche_ = address(seniorTranche);
-        seniorOperator = new OperatorMock();
+        seniorOperator = new OperatorMock(dai_);
         seniorOperator_ = address(seniorOperator);
         seniorTranche.depend("token", drop_);
 
@@ -198,11 +201,12 @@ contract TinlakeManagerUnitTest is DSTest {
 
     function draw(uint wad) public {
         uint selfBalanceDAI = dai.balanceOf(self);
+        uint totalSupplyDAI = dai.totalSupply();
 
         mgr.draw(wad);
-        
-        // chack DAI were minted
+        // chack DAI were minted & transferred correctly
         assertEq(dai.balanceOf(self), add(selfBalanceDAI, wad));
+        // assertEq(dai.totalSupply(), sub(totalSupplyDAI, wad));
 
         // assert frob was called with correct values
         assertEq(vat.calls("frob"), 1);
@@ -216,13 +220,13 @@ contract TinlakeManagerUnitTest is DSTest {
 
     function wipe(uint wad) public {
         uint selfBalanceDAI = dai.balanceOf(self);
-        uint mgrBalanceDAI = dai.balanceOf(mgr_);
+        uint totalSupplyDAI = dai.totalSupply();
 
         mgr.wipe(wad);
 
-         // chack DAI were minted
+         // chack DAI were transferred & burned
         assertEq(dai.balanceOf(self), sub(selfBalanceDAI, wad));
-        assertEq(dai.balanceOf(mgr_), add(mgrBalanceDAI, wad));
+        // assertEq(dai.totalSupply(), sub(totalSupplyDAI, wad));
 
         // assert frob was called with correct values
         assertEq(vat.calls("frob"), 2); // 1 call on draw &  1 call on wipe
@@ -232,7 +236,102 @@ contract TinlakeManagerUnitTest is DSTest {
         assertEq(vat.values_address("frob_w"), mgr_); 
         assertEq(vat.values_int("frob_dink"), 0); 
         assertEq(vat.values_int("frob_dart"), -int(wad)); 
+    }
 
+    function unwind(uint128 art, uint128 redeemedDAI, uint gem, uint remainingDROP) public {
+        uint selfBalanceDAI = dai.balanceOf(self);
+        uint totalSupplyDAI = dai.totalSupply();
+
+        mgr.unwind(1);
+
+        uint payback = min(art, redeemedDAI);
+        uint returnedDROP = sub(gem, remainingDROP);
+
+         // make sure redeemed DAI were burned
+        assertEq(dai.totalSupply(), sub(totalSupplyDAI, payback));
+
+        // assert frob was called with correct values
+        assertEq(vat.calls("frob"), 2); // 1 call on tell&join & 1 call on unwind
+        assertEq(vat.values_bytes32("frob_i"), mgr.ilk()); 
+        assertEq(vat.values_address("frob_u"), mgr_); 
+        assertEq(vat.values_address("frob_v"), mgr_); 
+        assertEq(vat.values_address("frob_w"), mgr_); 
+        assertEq(vat.values_int("frob_dink"), -int(returnedDROP)); 
+        assertEq(vat.values_int("frob_dart"), -int(payback)); 
+
+        // assert slip was called with correct values
+        assertEq(vat.calls("slip"), 2); // 1 call on tell&join & 1 call on unwind
+        assertEq(vat.values_address("slip_usr"), mgr_); 
+        assertEq(vat.values_bytes32("slip_ilk"), mgr.ilk());
+        assertEq(vat.values_int("slip_wad"), -int(returnedDROP));
+
+        // make sure remainder was transferred to owner correctly
+        if (redeemedDAI > art) {
+            uint remainder = selfBalanceDAI + (redeemedDAI - art);
+            assertEq(dai.balanceOf(self), add(selfBalanceDAI, remainder));
+        }
+    }
+
+    function testUnwindFullRepayment(uint128 redeemedDAI, uint128 gem) public {
+        // setup mock values
+        dai.mint(seniorOperator_, redeemedDAI); // mint enoguh funds for repayment
+        uint128 art = redeemedDAI;
+        uint128 remainingDROP = 0;
+
+        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, remainingDROP); 
+        vat.setArt(art);
+        vat.setGem(gem);
+       
+        // trigger tell condition & set safe to false
+        tell();
+        unwind(art, redeemedDAI, gem, remainingDROP);
+    }
+
+    function tesUnwindFullRepaymentWithRemainder(uint128 redeemedDAI, uint128 gem) public {
+        if (redeemedDAI < 2) return;
+        // setup mock values
+        dai.mint(seniorOperator_, redeemedDAI); // mint enoguh funds for repayment
+        uint128 art = redeemedDAI - 1; // art half the size of redeemed amount
+        uint128 remainingDROP = 0;
+
+        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, remainingDROP); 
+        vat.setArt(art);
+        vat.setGem(gem);
+       
+        // trigger tell condition & set safe to false
+        tell();
+        unwind(art, redeemedDAI, gem, remainingDROP);
+    }
+
+    function testUnwindPartialRepayment(uint128 redeemedDAI, uint128 gem) public {
+        if (redeemedDAI == 0) return;
+        // setup mock values
+        dai.mint(seniorOperator_, redeemedDAI); // mint enoguh funds for repayment
+        uint128 art = redeemedDAI + 1; // art half the size of redeemed amount
+        uint128 remainingDROP = 0;
+
+        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, remainingDROP); 
+        vat.setArt(art);
+        vat.setGem(gem);
+       
+        // trigger tell condition & set safe to false
+        tell();
+        unwind(art, redeemedDAI, gem, remainingDROP);
+    }
+
+        function testUnwindWithRemainingDROP(uint128 redeemedDAI, uint128 gem, uint128 remainingDROP) public {
+        if (redeemedDAI == 0 || remainingDROP > gem) return;
+        // setup mock values
+        dai.mint(seniorOperator_, redeemedDAI); // mint enoguh funds for repayment
+        uint128 art = redeemedDAI + 1; // art half the size of redeemed amount
+
+        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, remainingDROP); 
+        vat.setArt(art);
+        vat.setGem(gem);
+       
+        // trigger tell condition & set safe to false
+        tell();
+        unwind(art, redeemedDAI, gem, remainingDROP);
     }
 
     function testWipe(uint128 wad) public {
@@ -254,7 +353,7 @@ contract TinlakeManagerUnitTest is DSTest {
         
     }
 
-    function testFailWipeNotEnoughDAI(uint128 wad) public {
+    function testFailWipeInsufficientDAIBalance(uint128 wad) public {
        assert(wad > 0);
         testDraw(wad - 1);
         dai.approve(mgr_, wad);
@@ -336,7 +435,7 @@ contract TinlakeManagerUnitTest is DSTest {
         cage();
     }
 
-    function testCageVatNotlive() public {
+    function testCageVatNotLive() public {
         // revoke access permissions from self
         mgr.deny(self);
         vat.setLive(0);

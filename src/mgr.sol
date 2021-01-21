@@ -18,7 +18,6 @@
 
 pragma solidity >=0.5.12;
 import "./lib.sol";
-import "ds-test/test.sol";
 
 interface GemLike {
     function decimals() external view returns (uint);
@@ -71,7 +70,7 @@ interface RedeemLike {
 // not only DROP as an ERC20 balance in this contract, but also what's currently
 // undergoing redemption from the Tinlake pool.
 
-contract TinlakeManager is LibNote, DSTest {
+contract TinlakeManager is LibNote {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address usr) external note auth { require(live, "TinlakeMgr/not-live"); wards[usr] = 1; }
@@ -219,18 +218,16 @@ contract TinlakeManager is LibNote, DSTest {
 
     function unwind(uint endEpoch) public note {
         require(!safe && glad && live, "TinlakeManager/not-soft-liquidation");
-        (uint redeemed, , ,uint remainingDrop) = pool.disburse(endEpoch);
+        (uint redeemed, , , uint remainingDrop) = pool.disburse(endEpoch);
         uint dropReturned = sub(vat.gem(ilk, address(this)), remainingDrop);
         require(dropReturned <= 2 ** 255, "TinlakeManager/overflow");
 
         (, uint rate, , ,) = vat.ilks(ilk);
         (, uint art) = vat.urns(ilk, address(this));
         uint cdptab = mul(art, rate);
-
         uint payBack = min(redeemed, divup(cdptab, ONE));
 
         daiJoin.join(address(this), payBack);
-
         // Repay dai debt up to the full amount
         // and exit the gems used up
         uint dart = mul(ONE, payBack) / rate;
@@ -238,7 +235,6 @@ contract TinlakeManager is LibNote, DSTest {
         vat.frob(ilk, address(this), address(this), address(this),
                  -int(dropReturned), -int(dart));
         vat.slip(ilk, address(this), -int(dropReturned));
-
         // Return possible remainder to the owner
         dai.transfer(owner, dai.balanceOf(address(this)));
     }

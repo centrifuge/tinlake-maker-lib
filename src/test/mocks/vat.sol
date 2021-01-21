@@ -32,7 +32,7 @@ contract VatMock is Mock, Auth {
 
     function urns(bytes32, address) external returns (uint, uint) {
         calls["urns"]++;
-        return (values_uint["ink"], values_uint["tab"]);
+        return (values_uint["ink"], values_uint["art"]);
     }
 
     function hope(address usr) external { 
@@ -47,7 +47,7 @@ contract VatMock is Mock, Auth {
     }
 
     function frob(bytes32 i, address u, address v, address w, int dink, int dart) external { 
-        calls["frob"]++;     
+        calls["frob"]++;  
         values_bytes32["frob_i"] = i;
         values_address["frob_u"] = u;
         values_address["frob_v"] = v;
@@ -58,8 +58,11 @@ contract VatMock is Mock, Auth {
     }
 
     function live() external returns (uint) {
-       // emit log_named_uint("haha", 100);
         return values_uint["live"];
+    }
+
+    function gem(bytes32 ilk, address usr) external returns(uint) {
+       return values_uint["gem"];
     }
 
     // unit test helpers
@@ -67,16 +70,15 @@ contract VatMock is Mock, Auth {
         values_uint["live"] = live;
     } 
 
-    // unit test helpers
+    function setGem(uint wad) external {
+        values_uint["gem"] = wad;
+    }
+
     function setInk(uint wad) external {
         values_uint["ink"] = wad;
     }
 
-    function increaseTab(uint wad) external {
-        values_uint["tab"] = safeAdd(values_uint["tab"], wad);
-    }
-
-    function decreaseTab(uint wad) external {
-        values_uint["tab"] = safeSub(values_uint["tab"], wad);
+    function setArt(uint wad) external {
+        values_uint["art"] = wad;
     }
 }

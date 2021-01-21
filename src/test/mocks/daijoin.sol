@@ -31,8 +31,7 @@ contract DaiJoinMock is Mock, Auth {
     }
 
     function join(address usr, uint wad) external {
-        calls["join"]++;    
-        values_uint["join_wad"] = wad;
+        dai.burn(usr, wad);
     }
 
     function exit(address usr, uint wad) external {

@@ -18,16 +18,36 @@ import "ds-test/test.sol";
 
 import "../../../../lib/tinlake/src/test/mock/mock.sol";
 import "./../auth.sol";
+import { Dai } from "dss/dai.sol";
 
 
 contract OperatorMock is Mock, Auth {
 
-    constructor() public {
+    Dai dai;
+
+    constructor(address dai_) public {
         wards[msg.sender] = 1;
+        dai = Dai(dai_);
     }
 
     function redeemOrder(uint wad) public {
         calls["redeemOrder"]++;
         values_uint["redeemOrder_wad"] = wad;
     }
+
+    function disburse(uint endEpoch) external
+        returns(uint payoutCurrencyAmount, uint payoutTokenAmount, uint remainingSupplyCurrency,  uint remainingRedeemToken)
+    {
+        dai.transferFrom(address(this), msg.sender, values_uint["disburse_payoutCurrencyAmount"]);
+        return (values_uint["disburse_payoutCurrencyAmount"], values_uint["disburse_payoutTokenAmount"], values_uint["rdisburse_emainingSupplyCurrency"], values_uint["disburse_remainingRedeemToken"]);
+    }
+
+    // helper
+    function setDisburseValues(uint payoutCurrencyAmount, uint payoutTokenAmount, uint remainingSupplyCurrency,  uint remainingRedeemToken) external {
+        values_uint["disburse_payoutCurrencyAmount"] = payoutCurrencyAmount;
+        values_uint["disburse_payoutTokenAmount"] =  payoutTokenAmount;
+        values_uint["disburse_remainingSupplyCurrency"] = remainingSupplyCurrency;
+        values_uint["disburse_remainingRedeemToken"] = remainingRedeemToken;
+    }
+
 }
