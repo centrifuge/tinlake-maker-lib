@@ -164,7 +164,7 @@ contract TinlakeManagerUnitTest is DSTest {
         assert(!mgr.live());
     }
 
-    function  changeOwner() public {
+    function changeOwner() public {
         // change mgr owner to different address
         address random_ = address(new TrancheMock());
         mgr.setOwner(random_);
