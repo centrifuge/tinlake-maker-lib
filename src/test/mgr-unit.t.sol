@@ -262,6 +262,7 @@ contract TinlakeManagerUnitTest is DSTest {
     }
 
     function testFailWipeNoDAIApproval(uint128 wad) public {
+        assert(wad > 0);
         testDraw(wad);
         wipe(wad);
     }
