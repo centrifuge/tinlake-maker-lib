@@ -307,7 +307,7 @@ contract TinlakeManagerUnitTest is DSTest {
         if (redeemedDAI == 0) return;
         // setup mock values
         dai.mint(seniorOperator_, redeemedDAI); // mint enoguh funds for repayment
-        uint128 art = redeemedDAI + 1; // art half the size of redeemed amount
+        uint128 art = redeemedDAI + 1; // art smaller then redeemedDAI
         uint128 remainingDROP = 0;
 
         seniorOperator.setDisburseValues(redeemedDAI, 0, 0, remainingDROP); 
@@ -319,11 +319,11 @@ contract TinlakeManagerUnitTest is DSTest {
         unwind(art, redeemedDAI, gem, remainingDROP);
     }
 
-        function testUnwindWithRemainingDROP(uint128 redeemedDAI, uint128 gem, uint128 remainingDROP) public {
+    function testUnwindWithRemainingDROP(uint128 redeemedDAI, uint128 gem, uint128 remainingDROP) public {
         if (redeemedDAI == 0 || remainingDROP > gem) return;
         // setup mock values
         dai.mint(seniorOperator_, redeemedDAI); // mint enoguh funds for repayment
-        uint128 art = redeemedDAI + 1; // art half the size of redeemed amount
+        uint128 art = redeemedDAI + 1; // art bigger then redeemedDAI
 
         seniorOperator.setDisburseValues(redeemedDAI, 0, 0, remainingDROP); 
         vat.setArt(art);
