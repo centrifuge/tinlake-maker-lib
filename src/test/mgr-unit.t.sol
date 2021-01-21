@@ -239,6 +239,11 @@ contract TinlakeManagerUnitTest is DSTest {
     }
 
     function unwind(uint128 art, uint128 redeemedDAI, uint gem, uint remainingDROP) public {
+        // setup mocks
+        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, remainingDROP); 
+        vat.setArt(art);
+        vat.setGem(gem);
+
         uint selfBalanceDAI = dai.balanceOf(self);
         uint totalSupplyDAI = dai.totalSupply();
 
@@ -272,67 +277,62 @@ contract TinlakeManagerUnitTest is DSTest {
         }
     }
 
+    function testUnwind(uint128 art, uint128 redeemedDAI, uint128 gem, uint128 remainingDROP) public {
+        if (remainingDROP > gem) return; // avoid overflow
+        dai.mint(seniorOperator_, redeemedDAI); // mint enough DAI for redemption
+        // trigger tell condition & set safe to false
+        tell();
+        unwind(art, redeemedDAI, gem, remainingDROP);
+    }
+
     function testUnwindFullRepayment(uint128 redeemedDAI, uint128 gem) public {
-        // setup mock values
-        dai.mint(seniorOperator_, redeemedDAI); // mint enoguh funds for repayment
         uint128 art = redeemedDAI;
-        uint128 remainingDROP = 0;
+        testUnwind(art, redeemedDAI, gem, 0);
+    }
 
-        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, remainingDROP); 
-        vat.setArt(art);
-        vat.setGem(gem);
-       
+    function testUnwindFullRepaymentWithRemainder(uint128 redeemedDAI, uint128 gem, uint128 art) public {
+        // make sure art is smaller then redeemedDAI
+        if (art >= redeemedDAI ) return;
+        testUnwind(art, redeemedDAI, gem, 0);
+    }
+
+    function testUnwindPartialRepayment(uint128 redeemedDAI, uint128 gem, uint128 art) public {
+         if (art <= redeemedDAI ) return; // make sure art is bigger then redeemedDAI
+        testUnwind(art, redeemedDAI, gem, 0);
+    }
+
+    function testFailUnwindDropReturnedOverflow(uint128 redeemedDAI, uint128 gem, uint128 art, uint128 remainingDROP) public {
+        assert(remainingDROP > gem); // remainingDROP > gem -> gem - remainingDROP will cause overflow
+        dai.mint(seniorOperator_, redeemedDAI); // mint enough DAI for redemption
         // trigger tell condition & set safe to false
         tell();
         unwind(art, redeemedDAI, gem, remainingDROP);
     }
 
-    function tesUnwindFullRepaymentWithRemainder(uint128 redeemedDAI, uint128 gem) public {
-        if (redeemedDAI < 2) return;
-        // setup mock values
-        dai.mint(seniorOperator_, redeemedDAI); // mint enoguh funds for repayment
-        uint128 art = redeemedDAI - 1; // art half the size of redeemed amount
-        uint128 remainingDROP = 0;
+    function testFailUnwindNotLive(uint128 art, uint128 redeemedDAI, uint128 gem, uint128 remainingDROP) public {
+        assert(remainingDROP > gem); // avoid overflow
+        dai.mint(seniorOperator_, redeemedDAI); // mint enough DAI for redemption
+        // trigger tell condition & set safe to false
+        tell();
+        // set live to false
+        cage();
+        unwind(art, redeemedDAI, gem, remainingDROP);
+    }
 
-        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, remainingDROP); 
-        vat.setArt(art);
-        vat.setGem(gem);
-       
+    function testFailUnwindInsufficientDAIBalance(uint128 art, uint128 redeemedDAI, uint128 gem, uint128 remainingDROP) public {
+        assert(remainingDROP > gem && redeemedDAI > 0 ); // make sure test is not failing bc of overflow
         // trigger tell condition & set safe to false
         tell();
         unwind(art, redeemedDAI, gem, remainingDROP);
     }
 
-    function testUnwindPartialRepayment(uint128 redeemedDAI, uint128 gem) public {
-        if (redeemedDAI == 0) return;
-        // setup mock values
-        dai.mint(seniorOperator_, redeemedDAI); // mint enoguh funds for repayment
-        uint128 art = redeemedDAI + 1; // art smaller then redeemedDAI
-        uint128 remainingDROP = 0;
-
-        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, remainingDROP); 
-        vat.setArt(art);
-        vat.setGem(gem);
-       
-        // trigger tell condition & set safe to false
-        tell();
+    function testFailUnwindSafe(uint128 art, uint128 redeemedDAI, uint128 gem, uint128 remainingDROP) public {
+        assert(remainingDROP > gem); // avoid overflow
+        dai.mint(seniorOperator_, redeemedDAI); // mint enough DAI for redemption
         unwind(art, redeemedDAI, gem, remainingDROP);
     }
-
-    function testUnwindWithRemainingDROP(uint128 redeemedDAI, uint128 gem, uint128 remainingDROP) public {
-        if (redeemedDAI == 0 || remainingDROP > gem) return;
-        // setup mock values
-        dai.mint(seniorOperator_, redeemedDAI); // mint enoguh funds for repayment
-        uint128 art = redeemedDAI + 1; // art bigger then redeemedDAI
-
-        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, remainingDROP); 
-        vat.setArt(art);
-        vat.setGem(gem);
-       
-        // trigger tell condition & set safe to false
-        tell();
-        unwind(art, redeemedDAI, gem, remainingDROP);
-    }
+    
+    // function testFailUnwindNotGlad(uint128 wad) public { } TODO
 
     function testWipe(uint128 wad) public {
         testDraw(wad);
