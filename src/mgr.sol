@@ -260,9 +260,7 @@ contract TinlakeManager is LibNote {
 
     function recover(uint endEpoch) public note {
         require(!glad && live, "TinlakeManager/not-written-off");
-
         (uint recovered, , ,) = pool.disburse(endEpoch);
-
         uint payBack = min(recovered, tab / ONE);
         daiJoin.join(address(vow), payBack);
         tab = sub(tab, mul(payBack, ONE));

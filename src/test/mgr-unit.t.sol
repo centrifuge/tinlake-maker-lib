@@ -298,8 +298,11 @@ contract TinlakeManagerUnitTest is DSTest {
         assertEq(vat.values_bytes32("slip_ilk"), mgr.ilk());
         assertEq(vat.values_int("slip_wad"), -int(ink));
 
-        // assert fess was called with correct values
+        // assert correct DAI amount was written off
         uint tab = mul(vat.values_uint("rate"), art);
+        assertEq(mgr.tab(), tab);
+
+        // assert fess was called with correct values
         assertEq(vow.calls("fess"), 1);
         assertEq(vow.values_uint("fess_tab"), tab);
         // assert fess called
@@ -319,18 +322,17 @@ contract TinlakeManagerUnitTest is DSTest {
         assertEq(dai.balanceOf(self), add(ownerBalanceDAI, redeemedDAI));
     }
 
-
     function migrate() public {
          // deploy new mgr
         TinlakeManager newMgr = new TinlakeManager(address(vat),
-                                        dai_,
-                                        daiJoin_,
-                                        vow_,
-                                        drop_, // DROP token
-                                        seniorOperator_, // senior operator
-                                        address(this),
-                                        seniorTranche_, // senior tranche
-                                        ilk);
+                                    dai_,
+                                    daiJoin_,
+                                    vow_,
+                                    drop_, // DROP token
+                                    seniorOperator_, // senior operator
+                                    address(this),
+                                    seniorTranche_, // senior tranche
+                                    ilk);
         address newMgr_ = address(newMgr);
             
         mgr.migrate(newMgr_);
@@ -343,6 +345,52 @@ contract TinlakeManagerUnitTest is DSTest {
         // assert live is set to false
         assert(!mgr.live());
     }
+
+    function recover(uint redeemedDAI, uint epochId) public {
+        // dai balance of mgr owner before take
+        uint ownerBalanceDAI = dai.balanceOf(self);
+        uint mgrTab = mgr.tab();
+
+        // mint dai that can be disbursed
+        dai.mint(seniorOperator_, redeemedDAI); // mint enough DAI for redemptio
+        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, 0); 
+        uint totalSupplyDAI = dai.totalSupply();
+
+        mgr.recover(epochId);
+
+        // assert dai were transferred from operator correctly
+        assertEq(dai.balanceOf(seniorOperator_), 0);
+        
+        uint payBack = min(redeemedDAI,  mgrTab / ONE);
+        uint surplus = 0;
+        if (redeemedDAI > payBack) {
+            surplus = sub(redeemedDAI, payBack);
+        }
+       
+        assertEq(mgr.tab(), sub(mgrTab, mul(payBack, ONE)));
+        assertEq(dai.balanceOf(self), add(ownerBalanceDAI, surplus));
+        assertEq(dai.totalSupply(), sub(totalSupplyDAI, payBack));
+    }
+
+    function testRecover(uint redeemedDAI, uint epochId, uint128 art, uint128 ink) public {
+        // set glad to false & generate tab -> call sink
+        testSink(art, ink);
+        recover(redeemedDAI, epochId);
+    }
+
+
+    function failRecoverisGlad(uint redeemedDAI, uint epochId, uint art, uint ink) public { 
+        recover(redeemedDAI, epochId);
+    }
+
+    function failRecoverNotLive(uint redeemedDAI, uint epochId, uint art, uint ink) public {
+        // set live to false, call cage
+        cage();
+        // set glad to false & generate tab -> call sink
+        testSink(art, ink);
+        recover(redeemedDAI, epochId);
+    }
+
 
     function testMigrate() public {
           migrate();
