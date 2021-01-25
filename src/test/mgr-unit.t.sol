@@ -7,6 +7,7 @@ import { TrancheMock } from "../../lib/tinlake/src/lender/test/mock/tranche.sol"
 import { OperatorMock } from "./mocks/tinlake/operator.sol";
 import { SimpleToken } from "../../lib/tinlake/src/test/simple/token.sol";
 import { VatMock } from "./mocks/vat.sol";
+import { VowMock } from "./mocks/vow.sol";
 import { DaiJoinMock } from "./mocks/daijoin.sol";
 import { SpotterMock } from "./mocks/spotter.sol";
 import { Dai } from "dss/dai.sol";
@@ -16,12 +17,6 @@ interface Hevm {
     function warp(uint) external;
     function store(address,bytes32,bytes32) external;
     function load(address,bytes32) external returns (bytes32);
-}
-
-contract VowMock is Mock {
-    function fess(uint256 tab) public {
-        values_uint["fess_tab"] = tab;
-    }
 }
 
 contract TinlakeManagerUnitTest is DSTest {
@@ -98,6 +93,10 @@ contract TinlakeManagerUnitTest is DSTest {
                                      ilk);
         mgr_ = address(mgr);
         assertEq(vat.calls("hope"), 1);
+
+        // permissions
+        vat.rely(mgr_);
+        vow.rely(mgr_);
     }
 
    // creates all relevant mkr contracts to test the mgr
@@ -277,6 +276,106 @@ contract TinlakeManagerUnitTest is DSTest {
         }
     }
 
+    function sink(uint art, uint ink) public {
+        vat.setInk(ink);
+        vat.setArt(art);
+
+        // assert 
+        mgr.sink();
+
+
+        // assert grab was called with correct values
+        assertEq(vat.calls("grab"), 1);
+        assertEq(vat.values_bytes32("grab_i"), mgr.ilk()); 
+        assertEq(vat.values_address("grab_u"), mgr_); 
+        assertEq(vat.values_address("grab_v"), mgr_); 
+        assertEq(vat.values_address("grab_w"), vow_); 
+        assertEq(vat.values_int("grab_dink"), -int(ink)); 
+        assertEq(vat.values_int("grab_dart"), -int(art)); 
+
+        // assert slip was called with correct values
+        assertEq(vat.calls("slip"), 2); // 1 call on join & 1 call on sink
+        assertEq(vat.values_address("slip_usr"), mgr_); 
+        assertEq(vat.values_bytes32("slip_ilk"), mgr.ilk());
+        assertEq(vat.values_int("slip_wad"), -int(ink));
+
+        // assert fess was called with correct values
+        uint tab = mul(vat.values_uint("rate"), art);
+        assertEq(vow.calls("fess"), 1);
+        assertEq(vow.values_uint("fess_tab"), tab);
+        // assert fess called
+        assert(!mgr.glad());
+    }
+
+    function testSink(uint art, uint ink) public {
+        // make sure values are in valid range
+        if ((ink > 2 ** 128 ) || (art > 2 ** 128)) return;
+        // set safe to false, call tell
+        tell();
+        sink(art, ink);
+    }
+
+    function testFailSinkIsSafe(uint art, uint ink) public {
+         // make sure values are in valid range
+        assert((ink <= 2 ** 128 ) && (art <= 2 ** 128));
+        sink(art, ink);
+    }
+
+    function testFailSinkNotLive(uint art, uint ink) public {
+         // make sure values are in valid range
+        assert((ink <= 2 ** 128 ) && (art <= 2 ** 128));
+        // set safe to false, call tell
+        tell();
+        // set live to false, call cage
+        cage();
+        sink(art, ink);
+    }
+
+    function testFailSinkNotGlad(uint art, uint ink) public {
+          // make sure values are in valid range
+        assert((ink <= 2 ** 128 ) && (art <= 2 ** 128));
+        // set safe to false, call tell
+        tell();
+        sink(art, ink);
+        sink(art, ink); // try to sink second time
+    }
+
+    function testFailSinkNoVatAuth(uint art, uint ink) public {
+    // make sure values are in valid range
+        assert((ink <= 2 ** 128 ) && (art <= 2 ** 128));
+        // set safe to false, call tell
+        tell();
+        // revoke auth permissions from vat
+        vat.deny(mgr_);
+        sink(art, ink);
+    }
+
+    function testFailSinkNoVowAuth(uint art, uint ink) public {
+         // make sure values are in valid range
+        assert((ink <= 2 ** 128 ) && (art <= 2 ** 128));
+        // set safe to false, call tell
+        tell();
+        // revoke auth permissions from vow
+        vow.deny(mgr_);
+        sink(art, ink);
+    }
+
+    function testFailSinkInkOverFlow(uint art, uint ink) public {
+        // ink value has to produce overflow
+        assert((ink > 2 ** 255 ) && (art <= 2 ** 128));
+        // set safe to false, call tell
+        tell();
+        sink(art, ink);
+    }
+
+    function testFailSinkArtOverFlow(uint art, uint ink) public {
+        // art value has to produce overflow
+        assert((ink <= 2 ** 128 ) && (art > 2 ** 255));
+        // set safe to false, call tell
+        tell();
+        sink(art, ink);
+    }
+
     function testUnwind(uint128 art, uint128 redeemedDAI, uint128 gem, uint128 remainingDROP) public {
         if (remainingDROP > gem) return; // avoid overflow
         dai.mint(seniorOperator_, redeemedDAI); // mint enough DAI for redemption
@@ -332,8 +431,6 @@ contract TinlakeManagerUnitTest is DSTest {
         unwind(art, redeemedDAI, gem, remainingDROP);
     }
     
-    // function testFailUnwindNotGlad(uint128 wad) public { } TODO
-
     function testWipe(uint128 wad) public {
         testDraw(wad);
         dai.approve(mgr_, wad);
@@ -375,6 +472,15 @@ contract TinlakeManagerUnitTest is DSTest {
 
     function testDraw(uint128 wad) public {
         draw(wad);
+    }
+
+    function testFailUnwindNotGlad(uint128 art, uint128 redeemedDAI, uint128 gem, uint128 remainingDROP) public {
+        // make sure art is smaller then redeemedDAI
+        assert(art >= redeemedDAI );
+        // set glad to false, call sink
+        mgr.sink();
+        assert(!mgr.glad());
+        testUnwind(art, redeemedDAI, gem, remainingDROP);
     }
 
     function testFailDrawNotLive(uint128 wad) public {
@@ -486,10 +592,9 @@ contract TinlakeManagerUnitTest is DSTest {
         // wad = 100 ether;
         // mint collateral for test contract
         drop.mint(self, wad);
+        //  vat.rely(mgr_);
         // approve mgr to take collateral
         drop.approve(mgr_, wad);
-        // setup vat permissions
-        vat.rely(mgr_);
         join(wad);
     }
 
@@ -510,8 +615,6 @@ contract TinlakeManagerUnitTest is DSTest {
         drop.mint(self, wad);
         // approve mgr to take collateral
         drop.approve(mgr_, wad);
-        // setup vat permissions
-        vat.rely(mgr_);
         join(wad);
     }
 
@@ -522,8 +625,6 @@ contract TinlakeManagerUnitTest is DSTest {
         drop.mint(self, collateralBalance);
         // approve mgr to take collateral
         drop.approve(mgr_, collateralBalance);
-        // setup vat permissions
-        vat.rely(mgr_);
         join(wad);
     }
 
@@ -533,8 +634,6 @@ contract TinlakeManagerUnitTest is DSTest {
         // wad = 100 ether;
         // mint collateral for test contract
         drop.mint(self, wad);
-        // setup vat permissions
-        vat.rely(mgr_);
         join(wad);
     }
 
@@ -544,8 +643,6 @@ contract TinlakeManagerUnitTest is DSTest {
         drop.mint(self, wad);
         // approve mgr to take collateral
         drop.approve(mgr_, wad);
-        // setup vat permissions
-        vat.rely(mgr_);
         // revoke mgr auth from vat
         vat.deny(mgr_);
         join(wad);

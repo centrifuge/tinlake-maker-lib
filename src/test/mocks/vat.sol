@@ -46,6 +46,16 @@ contract VatMock is Mock, Auth {
         values_int["slip_wad"] = wad;
     }
 
+    function grab(bytes32 i, address u, address v, address w, int dink, int dart) external auth {
+        calls["grab"]++;
+        values_bytes32["grab_i"] = i;
+        values_address["grab_u"] = u;
+        values_address["grab_v"] = v;
+        values_address["grab_w"] = w;
+        values_int["grab_dink"] = dink;
+        values_int["grab_dart"] = dart; 
+    }
+
     function frob(bytes32 i, address u, address v, address w, int dink, int dart) external { 
         calls["frob"]++;  
         values_bytes32["frob_i"] = i;
