@@ -397,7 +397,7 @@ contract TinlakeManagerUnitTest is DSTest {
     }
 
     function testFailMigrateNoAuth() public {
-        // revove auth for mgr
+        // remove auth for mgr
         mgr.deny(self);
         migrate();
     }
