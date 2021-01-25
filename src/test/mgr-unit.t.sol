@@ -223,7 +223,7 @@ contract TinlakeManagerUnitTest is DSTest {
 
         mgr.wipe(wad);
 
-         // chack DAI were transferred & burned
+        // chack DAI were transferred & burned
         assertEq(dai.balanceOf(self), sub(selfBalanceDAI, wad));
         // assertEq(dai.totalSupply(), sub(totalSupplyDAI, wad));
 
@@ -319,6 +319,41 @@ contract TinlakeManagerUnitTest is DSTest {
         assertEq(dai.balanceOf(self), add(ownerBalanceDAI, redeemedDAI));
     }
 
+
+    function migrate() public {
+         // deploy new mgr
+        TinlakeManager newMgr = new TinlakeManager(address(vat),
+                                        dai_,
+                                        daiJoin_,
+                                        vow_,
+                                        drop_, // DROP token
+                                        seniorOperator_, // senior operator
+                                        address(this),
+                                        seniorTranche_, // senior tranche
+                                        ilk);
+        address newMgr_ = address(newMgr);
+            
+        mgr.migrate(newMgr_);
+
+        // assert hope was called
+        assertEq(vat.calls("hope"), 3); // 2 x for daijoin inside mgr constructor + 1 x in hope
+        // check allowance set for dai & collateral
+        assertEq(dai.allowance(mgr_, newMgr_), uint(-1));
+        assertEq(drop.allowance(mgr_, newMgr_), uint(-1));
+        // assert live is set to false
+        assert(!mgr.live());
+    }
+
+    function testMigrate() public {
+          migrate();
+    }
+
+    function testFailMigrateNoAuth() public {
+        // revove auth for mgr
+        mgr.deny(self);
+        migrate();
+    }
+
     function testTake(uint endEpoch, uint redeemedDAI) public {
         // set live to false, call cage
         cage();
@@ -369,7 +404,7 @@ contract TinlakeManagerUnitTest is DSTest {
     }
 
     function testFailSinkNoVatAuth(uint art, uint ink) public {
-    // make sure values are in valid range
+        // make sure values are in valid range
         assert((ink <= 2 ** 128 ) && (art <= 2 ** 128));
         // set safe to false, call tell
         tell();
