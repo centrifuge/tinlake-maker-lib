@@ -283,7 +283,6 @@ contract TinlakeManagerUnitTest is DSTest {
         // assert 
         mgr.sink();
 
-
         // assert grab was called with correct values
         assertEq(vat.calls("grab"), 1);
         assertEq(vat.values_bytes32("grab_i"), mgr.ilk()); 
@@ -307,6 +306,35 @@ contract TinlakeManagerUnitTest is DSTest {
         assert(!mgr.glad());
     }
 
+    function take(uint endEpoch, uint redeemedDAI) public {
+        // dai balance of mgr owner before take
+        uint ownerBalanceDAI = dai.balanceOf(self);
+        // mint dai that can be disbursed
+        dai.mint(seniorOperator_, redeemedDAI); // mint enough DAI for redemptio
+        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, 0); 
+
+        mgr.take(endEpoch);
+
+        // assert transfer to owner successfull
+        assertEq(dai.balanceOf(self), add(ownerBalanceDAI, redeemedDAI));
+    }
+
+    function testTake(uint endEpoch, uint redeemedDAI) public {
+        // set live to false, call cage
+        cage();
+        take(endEpoch, redeemedDAI);
+    }
+
+    function testFailTakeNotOwner(uint endEpoch, uint redeemedDAI) public {
+        // change ownership of mgr
+        testChangeOwner();
+        testTake(endEpoch, redeemedDAI);
+    }
+
+    function testFailTakeIsLive(uint endEpoch, uint redeemedDAI) public { 
+        take(endEpoch, redeemedDAI);
+    }
+    
     function testSink(uint art, uint ink) public {
         // make sure values are in valid range
         if ((ink > 2 ** 128 ) || (art > 2 ** 128)) return;
@@ -608,7 +636,6 @@ contract TinlakeManagerUnitTest is DSTest {
          testJoin(wad);
     }
 
-    // use uint256 as input to generate an overflow 
     function testFailJoinOverflow() public {
         uint wad = uint(-1);
         // mint collateral for test contract
