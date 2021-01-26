@@ -38,10 +38,9 @@ interface ChainlogAbstract {
 
 contract SpellAction {
     // MAINNET ADDRESSES
-    //
     // The contracts in this list should correspond to MCD core contracts, verify
-    //  against the current release list at:
-    //     https://changelog.makerdao.com/releases/mainnet/1.1.4/contracts.json
+    // against the current release list at:
+    // https://changelog.makerdao.com/releases/mainnet/1.1.4/contracts.json
     ChainlogAbstract constant CHANGELOG = ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
 
     address constant NS2DRP            = 0xE4C72b4dE5b0F9ACcEA880Ad0b1F944F85A9dAA0; //mainnet value
