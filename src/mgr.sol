@@ -79,6 +79,7 @@ contract TinlakeManager is LibNote {
         require(wards[msg.sender] == 1, "TinlakeMgr/not-authorized");
         _;
     }
+    
     modifier ownerOnly {
         require(msg.sender == owner, "TinlakeMgr/owner-only");
         _;
@@ -177,7 +178,7 @@ contract TinlakeManager is LibNote {
     // draw & wipe call daiJoin.exit/join immediately
     function draw(uint wad) public ownerOnly note {
         require(safe && live);
-        (,uint rate, , , ) = vat.ilks(ilk);
+        (, uint rate, , , ) = vat.ilks(ilk);
         uint dart = divup(mul(ONE, wad), rate);
         require(int(dart) >= 0, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this), 0, int(dart));
@@ -208,7 +209,7 @@ contract TinlakeManager is LibNote {
 
     // --- Liquidation ---
     function tell() public note {
-        require(safe);
+        require(safe); 
         require(wards[msg.sender] == 1 || (msg.sender == owner && !live), "TinlakeManager/not-authorized");
         (uint256 ink, ) = vat.urns(ilk, address(this));
         safe = false;
@@ -225,11 +226,9 @@ contract TinlakeManager is LibNote {
         (, uint rate, , ,) = vat.ilks(ilk);
         (, uint art) = vat.urns(ilk, address(this));
         uint cdptab = mul(art, rate);
-
         uint payBack = min(redeemed, divup(cdptab, ONE));
 
         daiJoin.join(address(this), payBack);
-
         // Repay dai debt up to the full amount
         // and exit the gems used up
         uint dart = mul(ONE, payBack) / rate;
@@ -239,7 +238,6 @@ contract TinlakeManager is LibNote {
         vat.grab(ilk, address(this), address(this), address(this),
                  -int(dropReturned), 0);
         vat.slip(ilk, address(this), -int(dropReturned));
-
         // Return possible remainder to the owner
         dai.transfer(owner, dai.balanceOf(address(this)));
     }
@@ -265,9 +263,7 @@ contract TinlakeManager is LibNote {
 
     function recover(uint endEpoch) public note {
         require(!glad && live, "TinlakeManager/not-written-off");
-
         (uint recovered, , ,) = pool.disburse(endEpoch);
-
         uint payBack = min(recovered, tab / ONE);
         daiJoin.join(address(vow), payBack);
         tab = sub(tab, mul(payBack, ONE));
