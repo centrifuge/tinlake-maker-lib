@@ -4,9 +4,6 @@
 [submodule "lib/ds-value"]
 	path = lib/ds-value
 	url = https://github.com/dapphub/ds-value
-[submodule "lib/tinlake"]
-	path = lib/tinlake
-	url = https://github.com/centrifuge/tinlake
 [submodule "lib/dss"]
 	path = lib/dss
 	url = https://github.com/centrifuge/dss.git
