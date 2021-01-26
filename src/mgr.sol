@@ -218,7 +218,8 @@ contract TinlakeManager is LibNote {
     function unwind(uint endEpoch) public note {
         require(!safe && glad && live, "TinlakeManager/not-soft-liquidation");
         (uint redeemed, , ,uint remainingDrop) = pool.disburse(endEpoch);
-        uint dropReturned = sub(vat.gem(ilk, address(this)), remainingDrop);
+        (uint ink, ) = vat.urns(ilk, address(this));
+        uint dropReturned = sub(ink, remainingDrop);
         require(dropReturned <= 2 ** 255, "TinlakeManager/overflow");
 
         (, uint rate, , ,) = vat.ilks(ilk);
