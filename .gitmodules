@@ -7,6 +7,3 @@
 [submodule "lib/dss"]
 	path = lib/dss
 	url = https://github.com/centrifuge/dss.git
-[submodule "lib/tinlake"]
-	path = lib/tinlake
-	url = https://github.com/centrifuge/tinlake
