@@ -20,17 +20,17 @@ pragma solidity >=0.5.12;
 import "./lib.sol";
 
 interface GemLike {
-    function decimals() external view returns (uint);
-    function transfer(address,uint) external returns (bool);
-    function transferFrom(address,address,uint) external returns (bool);
-    function approve(address,uint) external returns (bool);
-    function totalSupply() external returns (uint);
-    function balanceOf(address) external returns (uint);
+    function decimals() external view returns (uint256);
+    function transfer(address,uint256) external returns (bool);
+    function transferFrom(address,address,uint256) external returns (bool);
+    function approve(address,uint256) external returns (bool);
+    function totalSupply() external returns (uint256);
+    function balanceOf(address) external returns (uint256);
 }
 
 interface GemJoinLike {
-    function join(address,uint) external;
-    function exit(address,uint) external;
+    function join(address,uint256) external;
+    function exit(address,uint256) external;
 }
 
 interface VowLike {
@@ -38,21 +38,21 @@ interface VowLike {
 }
 
 interface VatLike {
-    function live() external view returns (uint);
-    function slip(bytes32,address,int) external;
+    function live() external view returns (uint256);
+    function slip(bytes32,address,int256) external;
     function flux(bytes32,address,address,uint256) external;
-    function ilks(bytes32) external returns (uint,uint,uint,uint,uint);
-    function urns(bytes32,address) external returns (uint,uint);
-    function move(address,address,uint) external;
-    function frob(bytes32,address,address,address,int,int) external;
+    function ilks(bytes32) external returns (uint256,uint256,uint256,uint256,uint256);
+    function urns(bytes32,address) external returns (uint256,uint256);
+    function move(address,address,uint256) external;
+    function frob(bytes32,address,address,address,int256,int256) external;
     function grab(bytes32,address,address,address,int256,int256) external;
-    function gem(bytes32,address) external returns (uint);
+    function gem(bytes32,address) external returns (uint256);
     function hope(address) external;
 }
 
 interface RedeemLike {
-    function redeemOrder(uint) external;
-    function disburse(uint) external returns (uint,uint,uint,uint);
+    function redeemOrder(uint256) external;
+    function disburse(uint256) external returns (uint256,uint256,uint256,uint256);
 }
 
 // This contract is essentially a merge of
@@ -72,7 +72,7 @@ interface RedeemLike {
 
 contract TinlakeManager is LibNote {
     // --- Auth ---
-    mapping (address => uint) public wards;
+    mapping (address => uint256) public wards;
     function rely(address usr) external note auth { require(live, "TinlakeMgr/not-live"); wards[usr] = 1; }
     function deny(address usr) external note auth { require(live, "TinlakeMgr/not-live"); wards[usr] = 0; }
     modifier auth {
@@ -133,10 +133,10 @@ contract TinlakeManager is LibNote {
         live = true;
         glad = true;
 
-        dai.approve(daiJoin_, uint(-1));
+        dai.approve(daiJoin_, uint256(-1));
         vat.hope(daiJoin_);
-        gem.approve(pool_, uint(-1));
-        gem.approve(tranche, uint(-1));
+        gem.approve(pool_, uint256(-1));
+        gem.approve(tranche, uint256(-1));
     }
 
     // --- Math ---
@@ -161,17 +161,17 @@ contract TinlakeManager is LibNote {
     // join & exit move the gem directly into/from the urn
     function join(uint256 wad) public ownerOnly note {
         require(safe && live);
-        require(int(wad) >= 0, "TinlakeManager/overflow");
+        require(int256(wad) >= 0, "TinlakeManager/overflow");
         gem.transferFrom(msg.sender, address(this), wad);
-        vat.slip(ilk, address(this), int(wad));
-        vat.frob(ilk, address(this), address(this), address(this), int(wad), 0);
+        vat.slip(ilk, address(this), int256(wad));
+        vat.frob(ilk, address(this), address(this), address(this), int256(wad), 0);
     }
 
     function exit(uint256 wad) public ownerOnly note {
         require(safe && live);
         require(wad <= 2 ** 255, "TinlakeManager/overflow");
-        vat.frob(ilk, address(this), address(this), address(this), -int(wad), 0);
-        vat.slip(ilk, address(this), -int(wad));
+        vat.frob(ilk, address(this), address(this), address(this), -int256(wad), 0);
+        vat.slip(ilk, address(this), -int256(wad));
         gem.transfer(msg.sender, wad);
     }
 
@@ -180,8 +180,8 @@ contract TinlakeManager is LibNote {
         require(safe && live);
         (, uint256 rate, , , ) = vat.ilks(ilk);
         uint256 dart = divup(mul(ONE, wad), rate);
-        require(int(dart) >= 0, "TinlakeManager/overflow");
-        vat.frob(ilk, address(this), address(this), address(this), 0, int(dart));
+        require(int256(dart) >= 0, "TinlakeManager/overflow");
+        vat.frob(ilk, address(this), address(this), address(this), 0, int256(dart));
         daiJoin.exit(msg.sender, wad);
     }
 
@@ -192,7 +192,7 @@ contract TinlakeManager is LibNote {
         (,uint256 rate, , , ) = vat.ilks(ilk);
         uint256 dart = mul(ONE, wad) / rate;
         require(dart <= 2 ** 255, "TinlakeManager/overflow");
-        vat.frob(ilk, address(this), address(this), address(this), 0, -int(dart));
+        vat.frob(ilk, address(this), address(this), address(this), 0, -int256(dart));
     }
 
     // --- Administration ---
@@ -202,8 +202,8 @@ contract TinlakeManager is LibNote {
 
     function migrate(address dst) public auth note {
         vat.hope(dst);
-        dai.approve(dst, uint(-1));
-        gem.approve(dst, uint(-1));
+        dai.approve(dst, uint256(-1));
+        gem.approve(dst, uint256(-1));
         live = false;
     }
 
@@ -234,10 +234,10 @@ contract TinlakeManager is LibNote {
         uint256 dart = mul(ONE, payBack) / rate;
         require(dart <= 2 ** 255, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this),
-                 0, -int(dart));
+                 0, -int256(dart));
         vat.grab(ilk, address(this), address(this), address(this),
-                 -int(dropReturned), 0);
-        vat.slip(ilk, address(this), -int(dropReturned));
+                 -int256(dropReturned), 0);
+        vat.slip(ilk, address(this), -int256(dropReturned));
         // Return possible remainder to the owner
         dai.transfer(owner, dai.balanceOf(address(this)));
     }
@@ -253,9 +253,9 @@ contract TinlakeManager is LibNote {
                  address(this),
                  address(this),
                  address(vow),
-                 -int(ink),
-                 -int(art));
-        vat.slip(ilk, address(this), -int(ink));
+                 -int256(ink),
+                 -int256(art));
+        vat.slip(ilk, address(this), -int256(ink));
         tab = mul(rate, art);
         vow.fess(tab);
         glad = false;
