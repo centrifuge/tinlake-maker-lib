@@ -159,13 +159,6 @@ contract TinlakeManagerUnitTest is DSTest {
     }
 
     function cage() public {
-        uint glad;
-        if (mgr.glad()) {
-            glad = 1;
-        }
-
-        emit log_named_uint("glad", glad);
-
         mgr.cage();
         assert(!mgr.live());
         assert(!mgr.glad());
@@ -315,7 +308,6 @@ contract TinlakeManagerUnitTest is DSTest {
         assertEq(vow.values_uint("fess_tab"), tab);
         // assert fess called
         assert(!mgr.glad());
-        emit log_named_bytes32("hi", "success");
     }
 
     function migrate() public {
