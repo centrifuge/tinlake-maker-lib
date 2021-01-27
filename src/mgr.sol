@@ -140,7 +140,7 @@ contract TinlakeManager is LibNote {
     }
 
     // --- Math ---
-    uint256 constant ONE = 10 ** 27;
+    uint256 constant RAY = 10 ** 27;
     function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
         require((z = x + y) >= x);
     }
@@ -179,7 +179,7 @@ contract TinlakeManager is LibNote {
     function draw(uint256 wad) public ownerOnly note {
         require(safe && live);
         (, uint256 rate, , , ) = vat.ilks(ilk);
-        uint256 dart = divup(mul(ONE, wad), rate);
+        uint256 dart = divup(mul(RAY, wad), rate);
         require(int256(dart) >= 0, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this), 0, int256(dart));
         daiJoin.exit(msg.sender, wad);
@@ -190,7 +190,7 @@ contract TinlakeManager is LibNote {
         dai.transferFrom(msg.sender, address(this), wad);
         daiJoin.join(address(this), wad);
         (,uint256 rate, , , ) = vat.ilks(ilk);
-        uint256 dart = mul(ONE, wad) / rate;
+        uint256 dart = mul(RAY, wad) / rate;
         require(dart <= 2 ** 255, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this), 0, -int256(dart));
     }
@@ -226,12 +226,12 @@ contract TinlakeManager is LibNote {
         (, uint256 rate, , ,) = vat.ilks(ilk);
         (, uint256 art) = vat.urns(ilk, address(this));
         uint256 cdptab = mul(art, rate);
-        uint256 payBack = min(redeemed, divup(cdptab, ONE));
+        uint256 payBack = min(redeemed, divup(cdptab, RAY));
 
         daiJoin.join(address(this), payBack);
         // Repay dai debt up to the full amount
         // and exit the gems used up
-        uint256 dart = mul(ONE, payBack) / rate;
+        uint256 dart = mul(RAY, payBack) / rate;
         require(dart <= 2 ** 255, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this),
                  0, -int256(dart));
@@ -265,9 +265,9 @@ contract TinlakeManager is LibNote {
         require(!glad, "TinlakeManager/not-written-off");
 
         (uint256 recovered, , ,) = pool.disburse(endEpoch);
-        uint256 payBack = min(recovered, tab / ONE);
+        uint256 payBack = min(recovered, tab / RAY);
         daiJoin.join(address(vow), payBack);
-        tab = sub(tab, mul(payBack, ONE));
+        tab = sub(tab, mul(payBack, RAY));
         dai.transfer(owner, dai.balanceOf(address(this)));
     }
 
