@@ -6,4 +6,5 @@ build: update
 	dapp --use solc:0.5.15 build
 test: update
 	dapp --use solc:0.5.15 test --rpc
-deploy :; dapp create TinlakeMakerLib
+deploy: build
+	dapp create TinlakeMakerLib
