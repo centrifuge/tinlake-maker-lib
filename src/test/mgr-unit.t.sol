@@ -161,6 +161,8 @@ contract TinlakeManagerUnitTest is DSTest {
     function cage() public {
         mgr.cage();
         assert(!mgr.live());
+        assert(!mgr.glad());
+ 
     }
 
     function changeOwner() public {
@@ -309,19 +311,6 @@ contract TinlakeManagerUnitTest is DSTest {
         assert(!mgr.glad());
     }
 
-    function take(uint endEpoch, uint redeemedDAI) public {
-        // dai balance of mgr owner before take
-        uint ownerBalanceDAI = dai.balanceOf(self);
-        // mint dai that can be disbursed
-        dai.mint(seniorOperator_, redeemedDAI); // mint enough DAI for redemptio
-        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, 0); 
-
-        mgr.take(endEpoch);
-
-        // assert transfer to owner successfull
-        assertEq(dai.balanceOf(self), add(ownerBalanceDAI, redeemedDAI));
-    }
-
     function migrate() public {
          // deploy new mgr
         TinlakeManager newMgr = new TinlakeManager(address(vat),
@@ -400,22 +389,6 @@ contract TinlakeManagerUnitTest is DSTest {
         // remove auth for mgr
         mgr.deny(self);
         migrate();
-    }
-
-    function testTake(uint endEpoch, uint redeemedDAI) public {
-        // set live to false, call cage
-        cage();
-        take(endEpoch, redeemedDAI);
-    }
-
-    function testFailTakeNotOwner(uint endEpoch, uint redeemedDAI) public {
-        // change ownership of mgr
-        testChangeOwner();
-        testTake(endEpoch, redeemedDAI);
-    }
-
-    function testFailTakeIsLive(uint endEpoch, uint redeemedDAI) public { 
-        take(endEpoch, redeemedDAI);
     }
     
     function testSink(uint art, uint ink) public {

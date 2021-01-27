@@ -262,7 +262,8 @@ contract TinlakeManager is LibNote {
     }
 
     function recover(uint endEpoch) public note {
-        require(!glad && live, "TinlakeManager/not-written-off");
+        require(!glad, "TinlakeManager/not-written-off");
+
         (uint recovered, , ,) = pool.disburse(endEpoch);
         uint payBack = min(recovered, tab / ONE);
         daiJoin.join(address(vow), payBack);
@@ -270,15 +271,14 @@ contract TinlakeManager is LibNote {
         dai.transfer(owner, dai.balanceOf(address(this)));
     }
 
-    // --- Global settlement ---
-    function take(uint endEpoch) public note ownerOnly {
-        require(!live, "TinlakeManager/not-live");
-        pool.disburse(endEpoch);
-        dai.transfer(msg.sender, dai.balanceOf(address(this)));
-    }
-
     function cage() external note {
+        if (tab == 0) {
+            (, uint256 art) = vat.urns(ilk, address(this));
+            (, uint rate, , ,) = vat.ilks(ilk);
+            tab = mul(rate, art);
+        }
         require(wards[msg.sender] == 1 || vat.live() == 0, "TinlakeManager/not-authorized");
         live = false;
+        glad = false;
     }
 }
