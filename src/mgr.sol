@@ -79,7 +79,7 @@ contract TinlakeManager is LibNote {
         require(wards[msg.sender] == 1, "TinlakeMgr/not-authorized");
         _;
     }
-    
+
     modifier ownerOnly {
         require(msg.sender == owner, "TinlakeMgr/owner-only");
         _;
@@ -92,7 +92,7 @@ contract TinlakeManager is LibNote {
     bool public glad; // Write-off not triggered
     bool public live; // Global settlement not triggered
 
-    uint public tab;  // Dai written off
+    uint256 public tab;  // Dai written off
     bytes32 public ilk; // Constant (TODO: hardcode)
 
     // --- Contracts ---
@@ -108,7 +108,7 @@ contract TinlakeManager is LibNote {
     GemLike      public tin;
     RedeemLike   public pool;
 
-    uint public constant dec = 18;
+    uint256 public constant dec = 18;
 
     constructor(address vat_,      address dai_,
                 address daiJoin_,  address vow_,
@@ -140,26 +140,26 @@ contract TinlakeManager is LibNote {
     }
 
     // --- Math ---
-    uint constant ONE = 10 ** 27;
-    function add(uint x, uint y) internal pure returns (uint z) {
+    uint256 constant ONE = 10 ** 27;
+    function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
         require((z = x + y) >= x);
     }
-    function sub(uint x, uint y) internal pure returns (uint z) {
+    function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
         require((z = x - y) <= x);
     }
-    function mul(uint x, uint y) internal pure returns (uint z) {
+    function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
         require(y == 0 || (z = x * y) / y == x);
     }
-    function divup(uint x, uint y) internal pure returns (uint z) {
+    function divup(uint256 x, uint256 y) internal pure returns (uint256 z) {
         z = add(x, sub(y, 1)) / y;
     }
-    function min(uint x, uint y) internal pure returns (uint z) {
+    function min(uint256 x, uint256 y) internal pure returns (uint256 z) {
         z = x > y ? y : x;
     }
 
     // --- Vault Operation---
     // join & exit move the gem directly into/from the urn
-    function join(uint wad) public ownerOnly note {
+    function join(uint256 wad) public ownerOnly note {
         require(safe && live);
         require(int(wad) >= 0, "TinlakeManager/overflow");
         gem.transferFrom(msg.sender, address(this), wad);
@@ -167,7 +167,7 @@ contract TinlakeManager is LibNote {
         vat.frob(ilk, address(this), address(this), address(this), int(wad), 0);
     }
 
-    function exit(uint wad) public ownerOnly note {
+    function exit(uint256 wad) public ownerOnly note {
         require(safe && live);
         require(wad <= 2 ** 255, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this), -int(wad), 0);
@@ -176,21 +176,21 @@ contract TinlakeManager is LibNote {
     }
 
     // draw & wipe call daiJoin.exit/join immediately
-    function draw(uint wad) public ownerOnly note {
+    function draw(uint256 wad) public ownerOnly note {
         require(safe && live);
-        (, uint rate, , , ) = vat.ilks(ilk);
-        uint dart = divup(mul(ONE, wad), rate);
+        (, uint256 rate, , , ) = vat.ilks(ilk);
+        uint256 dart = divup(mul(ONE, wad), rate);
         require(int(dart) >= 0, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this), 0, int(dart));
         daiJoin.exit(msg.sender, wad);
     }
 
-    function wipe(uint wad) public ownerOnly note {
+    function wipe(uint256 wad) public ownerOnly note {
         require(safe && live);
         dai.transferFrom(msg.sender, address(this), wad);
         daiJoin.join(address(this), wad);
-        (,uint rate, , , ) = vat.ilks(ilk);
-        uint dart = mul(ONE, wad) / rate;
+        (,uint256 rate, , , ) = vat.ilks(ilk);
+        uint256 dart = mul(ONE, wad) / rate;
         require(dart <= 2 ** 255, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this), 0, -int(dart));
     }
@@ -209,29 +209,29 @@ contract TinlakeManager is LibNote {
 
     // --- Liquidation ---
     function tell() public note {
-        require(safe); 
+        require(safe);
         require(wards[msg.sender] == 1 || (msg.sender == owner && !live), "TinlakeManager/not-authorized");
         (uint256 ink, ) = vat.urns(ilk, address(this));
         safe = false;
         pool.redeemOrder(ink);
     }
 
-    function unwind(uint endEpoch) public note {
+    function unwind(uint256 endEpoch) public note {
         require(!safe && glad && live, "TinlakeManager/not-soft-liquidation");
-        (uint redeemed, , ,uint remainingDrop) = pool.disburse(endEpoch);
-        (uint ink, ) = vat.urns(ilk, address(this));
-        uint dropReturned = sub(ink, remainingDrop);
+        (uint256 redeemed, , ,uint256 remainingDrop) = pool.disburse(endEpoch);
+        (uint256 ink, ) = vat.urns(ilk, address(this));
+        uint256 dropReturned = sub(ink, remainingDrop);
         require(dropReturned <= 2 ** 255, "TinlakeManager/overflow");
 
-        (, uint rate, , ,) = vat.ilks(ilk);
-        (, uint art) = vat.urns(ilk, address(this));
-        uint cdptab = mul(art, rate);
-        uint payBack = min(redeemed, divup(cdptab, ONE));
+        (, uint256 rate, , ,) = vat.ilks(ilk);
+        (, uint256 art) = vat.urns(ilk, address(this));
+        uint256 cdptab = mul(art, rate);
+        uint256 payBack = min(redeemed, divup(cdptab, ONE));
 
         daiJoin.join(address(this), payBack);
         // Repay dai debt up to the full amount
         // and exit the gems used up
-        uint dart = mul(ONE, payBack) / rate;
+        uint256 dart = mul(ONE, payBack) / rate;
         require(dart <= 2 ** 255, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this),
                  0, -int(dart));
@@ -248,7 +248,7 @@ contract TinlakeManager is LibNote {
         (uint256 ink, uint256 art) = vat.urns(ilk, address(this));
         require(ink <= 2 ** 255, "TinlakeManager/overflow");
         require(art <= 2 ** 255, "TinlakeManager/overflow");
-        (, uint rate, , ,) = vat.ilks(ilk);
+        (, uint256 rate, , ,) = vat.ilks(ilk);
         vat.grab(ilk,
                  address(this),
                  address(this),
@@ -261,11 +261,11 @@ contract TinlakeManager is LibNote {
         glad = false;
     }
 
-    function recover(uint endEpoch) public note {
+    function recover(uint256 endEpoch) public note {
         require(!glad, "TinlakeManager/not-written-off");
 
-        (uint recovered, , ,) = pool.disburse(endEpoch);
-        uint payBack = min(recovered, tab / ONE);
+        (uint256 recovered, , ,) = pool.disburse(endEpoch);
+        uint256 payBack = min(recovered, tab / ONE);
         daiJoin.join(address(vow), payBack);
         tab = sub(tab, mul(payBack, ONE));
         dai.transfer(owner, dai.balanceOf(address(this)));
