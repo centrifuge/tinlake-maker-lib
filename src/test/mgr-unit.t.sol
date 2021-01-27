@@ -162,7 +162,6 @@ contract TinlakeManagerUnitTest is DSTest {
         mgr.cage();
         assert(!mgr.live());
         assert(!mgr.glad());
- 
     }
 
     function changeOwner() public {
@@ -468,21 +467,21 @@ contract TinlakeManagerUnitTest is DSTest {
         unwind(art, redeemedDAI, gem, remainingDROP);
     }
 
-    // function testUnwindFullRepayment(uint128 redeemedDAI, uint128 gem) public {
-    //     uint128 art = redeemedDAI;
-    //     testUnwind(art, redeemedDAI, gem, 0);
-    // }
+    function testUnwindFullRepayment(uint128 redeemedDAI, uint128 gem) public {
+        uint128 art = redeemedDAI;
+        testUnwind(art, redeemedDAI, gem, 0);
+    }
 
-    // function testUnwindFullRepaymentWithRemainder(uint128 redeemedDAI, uint128 gem, uint128 art) public {
-    //     // make sure art is smaller then redeemedDAI
-    //     if (art >= redeemedDAI ) return;
-    //     testUnwind(art, redeemedDAI, gem, 0);
-    // }
+    function testUnwindFullRepaymentWithRemainder(uint128 redeemedDAI, uint128 gem, uint128 art) public {
+        // make sure art is smaller then redeemedDAI
+        if (art >= redeemedDAI ) return;
+        testUnwind(art, redeemedDAI, gem, 0);
+    }
 
-    // function testUnwindPartialRepayment(uint128 redeemedDAI, uint128 gem, uint128 art) public {
-    //      if (art <= redeemedDAI ) return; // make sure art is bigger then redeemedDAI
-    //     testUnwind(art, redeemedDAI, gem, 0);
-    // }
+    function testUnwindPartialRepayment(uint128 redeemedDAI, uint128 gem, uint128 art) public {
+         if (art <= redeemedDAI ) return; // make sure art is bigger then redeemedDAI
+        testUnwind(art, redeemedDAI, gem, 0);
+    }
 
     function testFailUnwindDropReturnedOverflow(uint128 redeemedDAI, uint128 gem, uint128 art, uint128 remainingDROP) public {
         assert(remainingDROP > gem); // remainingDROP > gem -> gem - remainingDROP will cause overflow
@@ -621,20 +620,24 @@ contract TinlakeManagerUnitTest is DSTest {
         exit(uint(-1));
     }
 
-    function testCage() public {
+    function testCage(uint128 art, uint128 ink) public {
+        testSink(art, ink);
         cage();
     }
 
-    function testCageVatNotLive() public {
-        // revoke access permissions from self
-        mgr.deny(self);
+    function testCageVatNotLive(uint128 art, uint128 ink) public {
         vat.setLive(0);
-        cage();
+        testCage(art, ink);
     }
 
-    function testFailCageNoAuth() public {
+    function testFailCageNoAuth(uint128 art, uint128 ink) public {
         // revoke access permissions from self
         mgr.deny(self);
+        testCage(art, ink);
+    }
+
+    function testFailCageGlad() public {
+        // revoke access permissions from self
         cage();
     }
 
@@ -682,8 +685,8 @@ contract TinlakeManagerUnitTest is DSTest {
         join(wad);
     }
 
-    function testFailJoinNotLive(uint128 wad) public {
-        testCage();
+    function testFailJoinNotLive(uint128 art, uint128 ink, uint128 wad) public {
+        testCage(art, ink);
         testJoin(wad);
     }
 

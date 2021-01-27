@@ -272,13 +272,8 @@ contract TinlakeManager is LibNote {
     }
 
     function cage() external note {
-        if (tab == 0) {
-            (, uint256 art) = vat.urns(ilk, address(this));
-            (, uint rate, , ,) = vat.ilks(ilk);
-            tab = mul(rate, art);
-        }
+        require(!glad);
         require(wards[msg.sender] == 1 || vat.live() == 0, "TinlakeManager/not-authorized");
         live = false;
-        glad = false;
     }
 }
