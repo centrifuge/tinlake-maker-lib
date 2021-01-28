@@ -188,7 +188,7 @@ contract TinlakeManager {
     // join & exit move the gem directly into/from the urn
     function join(uint256 wad) public operatorOnly {
         require(safe && live, "TinlakeManager/bad-state");
-        require(int(wad) >= 0, "TinlakeManager/overflow");
+        require(int256(wad) >= 0, "TinlakeManager/overflow");
         gem.transferFrom(msg.sender, address(this), wad);
         vat.slip(ilk, address(this), int256(wad));
         vat.frob(ilk, address(this), address(this), address(this), int256(wad), 0);
