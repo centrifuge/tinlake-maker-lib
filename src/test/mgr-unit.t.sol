@@ -67,12 +67,12 @@ contract TinlakeManagerUnitTest is DSTest {
     address mgr_;
     address self;
 
-    // -- testing --                 
+    // -- testing --
     Hevm constant hevm = Hevm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
     uint rate;
 
     function setUp() public {
-        mkrDeploy();        
+        mkrDeploy();
         drop = new SimpleToken("DROP", "Tinlake DROP Token");
         drop_ = address(drop);
         seniorTranche = new TrancheMock();
@@ -105,7 +105,7 @@ contract TinlakeManagerUnitTest is DSTest {
         dai_ = address(dai);
         vat = new VatMock();
         vat_ = address(vat);
-        daiJoin = new DaiJoinMock(dai_); 
+        daiJoin = new DaiJoinMock(dai_);
         daiJoin_ = address(daiJoin);
         spotter = new SpotterMock();
         vow = new VowMock();
@@ -121,26 +121,26 @@ contract TinlakeManagerUnitTest is DSTest {
         uint selfBalanceDROP = drop.balanceOf(self);
 
         mgr.join(wad);
-        vat.setInk(wad); // helper 
+        vat.setInk(wad); // helper
 
         // assert collateral transferred
         assertEq(drop.balanceOf(mgr_), add(mgrBalanceDROP, wad));
         assertEq(drop.balanceOf(self), sub(selfBalanceDROP, wad));
-        
+
         // assert slip was called with correct values
         assertEq(vat.calls("slip"), 1);
-        assertEq(vat.values_address("slip_usr"), mgr_); 
+        assertEq(vat.values_address("slip_usr"), mgr_);
         assertEq(vat.values_bytes32("slip_ilk"), mgr.ilk());
         assertEq(vat.values_int("slip_wad"), int(wad));
-        
+
         // assert frob was called with correct values
         assertEq(vat.calls("frob"), 1);
-        assertEq(vat.values_bytes32("frob_i"), mgr.ilk()); 
-        assertEq(vat.values_address("frob_u"), mgr_); 
-        assertEq(vat.values_address("frob_v"), mgr_); 
-        assertEq(vat.values_address("frob_w"), mgr_); 
-        assertEq(vat.values_int("frob_dink"), int(wad)); 
-        assertEq(vat.values_int("frob_dart"), 0); 
+        assertEq(vat.values_bytes32("frob_i"), mgr.ilk());
+        assertEq(vat.values_address("frob_u"), mgr_);
+        assertEq(vat.values_address("frob_v"), mgr_);
+        assertEq(vat.values_address("frob_w"), mgr_);
+        assertEq(vat.values_int("frob_dink"), int(wad));
+        assertEq(vat.values_int("frob_dart"), 0);
     }
 
     function tell() public {
@@ -164,11 +164,11 @@ contract TinlakeManagerUnitTest is DSTest {
         assert(!mgr.glad());
     }
 
-    function changeOwner() public {
-        // change mgr owner to different address
+    function changeOperator() public {
+        // change mgr operator to different address
         address random_ = address(new TrancheMock());
-        mgr.setOwner(random_);
-        assertEq(mgr.owner(), random_);
+        mgr.setOperator(random_);
+        assertEq(mgr.operator(), random_);
     }
 
     function exit(uint wad) public {
@@ -176,7 +176,7 @@ contract TinlakeManagerUnitTest is DSTest {
         uint selfBalanceDROP = drop.balanceOf(self);
 
         mgr.exit(wad);
-        vat.setInk(sub(mgrBalanceDROP, wad)); // helper 
+        vat.setInk(sub(mgrBalanceDROP, wad)); // helper
 
         // assert collateral was transferred correctly from mgr
         assertEq(drop.balanceOf(mgr_), sub(mgrBalanceDROP, wad));
@@ -185,18 +185,18 @@ contract TinlakeManagerUnitTest is DSTest {
 
          // assert slip was called with correct values
         assertEq(vat.calls("slip"), 2); // 1 call on join + 1 call on exit
-        assertEq(vat.values_address("slip_usr"), mgr_); 
+        assertEq(vat.values_address("slip_usr"), mgr_);
         assertEq(vat.values_bytes32("slip_ilk"), mgr.ilk());
         assertEq(vat.values_int("slip_wad"), -int(wad));
-        
+
         // assert frob was called with correct values
         assertEq(vat.calls("frob"), 2); // 1 call on join + 1 call on exit
-        assertEq(vat.values_bytes32("frob_i"), mgr.ilk()); 
-        assertEq(vat.values_address("frob_u"), mgr_); 
-        assertEq(vat.values_address("frob_v"), mgr_); 
-        assertEq(vat.values_address("frob_w"), mgr_); 
-        assertEq(vat.values_int("frob_dink"), -int(wad)); 
-        assertEq(vat.values_int("frob_dart"), 0); 
+        assertEq(vat.values_bytes32("frob_i"), mgr.ilk());
+        assertEq(vat.values_address("frob_u"), mgr_);
+        assertEq(vat.values_address("frob_v"), mgr_);
+        assertEq(vat.values_address("frob_w"), mgr_);
+        assertEq(vat.values_int("frob_dink"), -int(wad));
+        assertEq(vat.values_int("frob_dart"), 0);
     }
 
     function draw(uint wad) public {
@@ -210,12 +210,12 @@ contract TinlakeManagerUnitTest is DSTest {
 
         // assert frob was called with correct values
         assertEq(vat.calls("frob"), 1);
-        assertEq(vat.values_bytes32("frob_i"), mgr.ilk()); 
-        assertEq(vat.values_address("frob_u"), mgr_); 
-        assertEq(vat.values_address("frob_v"), mgr_); 
-        assertEq(vat.values_address("frob_w"), mgr_); 
-        assertEq(vat.values_int("frob_dink"), 0); 
-        assertEq(vat.values_int("frob_dart"), int(wad)); 
+        assertEq(vat.values_bytes32("frob_i"), mgr.ilk());
+        assertEq(vat.values_address("frob_u"), mgr_);
+        assertEq(vat.values_address("frob_v"), mgr_);
+        assertEq(vat.values_address("frob_w"), mgr_);
+        assertEq(vat.values_int("frob_dink"), 0);
+        assertEq(vat.values_int("frob_dart"), int(wad));
     }
 
     function wipe(uint wad) public {
@@ -230,17 +230,17 @@ contract TinlakeManagerUnitTest is DSTest {
 
         // assert frob was called with correct values
         assertEq(vat.calls("frob"), 2); // 1 call on draw &  1 call on wipe
-        assertEq(vat.values_bytes32("frob_i"), mgr.ilk()); 
-        assertEq(vat.values_address("frob_u"), mgr_); 
-        assertEq(vat.values_address("frob_v"), mgr_); 
-        assertEq(vat.values_address("frob_w"), mgr_); 
-        assertEq(vat.values_int("frob_dink"), 0); 
-        assertEq(vat.values_int("frob_dart"), -int(wad)); 
+        assertEq(vat.values_bytes32("frob_i"), mgr.ilk());
+        assertEq(vat.values_address("frob_u"), mgr_);
+        assertEq(vat.values_address("frob_v"), mgr_);
+        assertEq(vat.values_address("frob_w"), mgr_);
+        assertEq(vat.values_int("frob_dink"), 0);
+        assertEq(vat.values_int("frob_dart"), -int(wad));
     }
 
     function unwind(uint128 art, uint128 redeemedDAI, uint gem, uint remainingDROP) public {
         // setup mocks
-        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, remainingDROP); 
+        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, remainingDROP);
         vat.setArt(art);
         vat.setInk(gem);
 
@@ -257,20 +257,20 @@ contract TinlakeManagerUnitTest is DSTest {
 
         // assert frob was called with correct values
         assertEq(vat.calls("frob"), 2); // 1 call on tell&join & 1 call on unwind
-        assertEq(vat.values_bytes32("frob_i"), mgr.ilk()); 
-        assertEq(vat.values_address("frob_u"), mgr_); 
-        assertEq(vat.values_address("frob_v"), mgr_); 
-        assertEq(vat.values_address("frob_w"), mgr_); 
-        assertEq(vat.values_int("frob_dink"), 0); 
-        assertEq(vat.values_int("frob_dart"), -int(payback)); 
+        assertEq(vat.values_bytes32("frob_i"), mgr.ilk());
+        assertEq(vat.values_address("frob_u"), mgr_);
+        assertEq(vat.values_address("frob_v"), mgr_);
+        assertEq(vat.values_address("frob_w"), mgr_);
+        assertEq(vat.values_int("frob_dink"), 0);
+        assertEq(vat.values_int("frob_dart"), -int(payback));
 
         // assert slip was called with correct values
         assertEq(vat.calls("slip"), 2); // 1 call on tell&join & 1 call on unwind
-        assertEq(vat.values_address("slip_usr"), mgr_); 
+        assertEq(vat.values_address("slip_usr"), mgr_);
         assertEq(vat.values_bytes32("slip_ilk"), mgr.ilk());
         assertEq(vat.values_int("slip_wad"), -int(returnedDROP));
 
-        // make sure remainder was transferred to owner correctly
+        // make sure remainder was transferred to operator correctly
         if (redeemedDAI > art) {
             uint remainder = selfBalanceDAI + (redeemedDAI - art);
             assertEq(dai.balanceOf(self), add(selfBalanceDAI, remainder));
@@ -281,21 +281,21 @@ contract TinlakeManagerUnitTest is DSTest {
         vat.setInk(ink);
         vat.setArt(art);
 
-        // assert 
+        // assert
         mgr.sink();
 
         // assert grab was called with correct values
         assertEq(vat.calls("grab"), 1);
-        assertEq(vat.values_bytes32("grab_i"), mgr.ilk()); 
-        assertEq(vat.values_address("grab_u"), mgr_); 
-        assertEq(vat.values_address("grab_v"), mgr_); 
-        assertEq(vat.values_address("grab_w"), vow_); 
-        assertEq(vat.values_int("grab_dink"), -int(ink)); 
-        assertEq(vat.values_int("grab_dart"), -int(art)); 
+        assertEq(vat.values_bytes32("grab_i"), mgr.ilk());
+        assertEq(vat.values_address("grab_u"), mgr_);
+        assertEq(vat.values_address("grab_v"), mgr_);
+        assertEq(vat.values_address("grab_w"), vow_);
+        assertEq(vat.values_int("grab_dink"), -int(ink));
+        assertEq(vat.values_int("grab_dart"), -int(art));
 
         // assert slip was called with correct values
         assertEq(vat.calls("slip"), 2); // 1 call on join & 1 call on sink
-        assertEq(vat.values_address("slip_usr"), mgr_); 
+        assertEq(vat.values_address("slip_usr"), mgr_);
         assertEq(vat.values_bytes32("slip_ilk"), mgr.ilk());
         assertEq(vat.values_int("slip_wad"), -int(ink));
 
@@ -322,7 +322,7 @@ contract TinlakeManagerUnitTest is DSTest {
                                     seniorTranche_, // senior tranche
                                     ilk);
         address newMgr_ = address(newMgr);
-            
+
         mgr.migrate(newMgr_);
 
         // assert hope was called
@@ -335,28 +335,28 @@ contract TinlakeManagerUnitTest is DSTest {
     }
 
     function recover(uint redeemedDAI, uint epochId) public {
-        // dai balance of mgr owner before take
-        uint ownerBalanceDAI = dai.balanceOf(self);
+        // dai balance of mgr operator before take
+        uint operatorBalanceDAI = dai.balanceOf(self);
         uint mgrTab = mgr.tab();
 
         // mint dai that can be disbursed
         dai.mint(seniorOperator_, redeemedDAI); // mint enough DAI for redemptio
-        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, 0); 
+        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, 0);
         uint totalSupplyDAI = dai.totalSupply();
 
         mgr.recover(epochId);
 
         // assert dai were transferred from operator correctly
         assertEq(dai.balanceOf(seniorOperator_), 0);
-        
+
         uint payBack = min(redeemedDAI,  mgrTab / ONE);
         uint surplus = 0;
         if (redeemedDAI > payBack) {
             surplus = sub(redeemedDAI, payBack);
         }
-       
+
         assertEq(mgr.tab(), sub(mgrTab, mul(payBack, ONE)));
-        assertEq(dai.balanceOf(self), add(ownerBalanceDAI, surplus));
+        assertEq(dai.balanceOf(self), add(operatorBalanceDAI, surplus));
         assertEq(dai.totalSupply(), sub(totalSupplyDAI, payBack));
     }
 
@@ -367,7 +367,7 @@ contract TinlakeManagerUnitTest is DSTest {
     }
 
 
-    function failRecoverisGlad(uint redeemedDAI, uint epochId, uint art, uint ink) public { 
+    function failRecoverisGlad(uint redeemedDAI, uint epochId, uint art, uint ink) public {
         recover(redeemedDAI, epochId);
     }
 
@@ -389,7 +389,7 @@ contract TinlakeManagerUnitTest is DSTest {
         mgr.deny(self);
         migrate();
     }
-    
+
     function testSink(uint art, uint ink) public {
         // make sure values are in valid range
         if ((ink > 2 ** 128 ) || (art > 2 ** 128)) return;
@@ -513,7 +513,7 @@ contract TinlakeManagerUnitTest is DSTest {
         dai.mint(seniorOperator_, redeemedDAI); // mint enough DAI for redemption
         unwind(art, redeemedDAI, gem, remainingDROP);
     }
-    
+
     function testWipe(uint128 wad) public {
         testDraw(wad);
         dai.approve(mgr_, wad);
@@ -530,7 +530,7 @@ contract TinlakeManagerUnitTest is DSTest {
         // set safe to false
         tell();
         testWipe(wad);
-        
+
     }
 
     function testFailWipeInsufficientDAIBalance(uint128 wad) public {
@@ -600,7 +600,7 @@ contract TinlakeManagerUnitTest is DSTest {
         // try to exit more then available
         exit(add(wad, 1));
     }
-    
+
     function testFailExitNotLive(uint128 wad) public {
         // set live to false
         cage();
@@ -641,20 +641,20 @@ contract TinlakeManagerUnitTest is DSTest {
         cage();
     }
 
-    function testChangeOwner() public {
-        assertEq(mgr.owner(), self);
-        changeOwner();
+    function testChangeOperator() public {
+        assertEq(mgr.operator(), self);
+        changeOperator();
     }
 
-    function testFailChangeOwnerNotOwner() public {
-        assertEq(mgr.owner(), self);
-        changeOwner();
-        // self not owner of mgr anymore, try changing owner one more time 
-        changeOwner();
+    function testFailChangeOperatorNotOperator() public {
+        assertEq(mgr.operator(), self);
+        changeOperator();
+        // self not operator of mgr anymore, try changing operator one more time
+        changeOperator();
     }
 
-    function testTell() public {  
-        tell();   
+    function testTell() public {
+        tell();
     }
 
     function testFailTellNotSafe() public {

@@ -17,7 +17,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pragma solidity >=0.5.12;
-import "./lib.sol";
 
 interface GemLike {
     function decimals() external view returns (uint);
@@ -70,23 +69,46 @@ interface RedeemLike {
 // not only DROP as an ERC20 balance in this contract, but also what's currently
 // undergoing redemption from the Tinlake pool.
 
-contract TinlakeManager is LibNote {
+contract TinlakeManager {
     // --- Auth ---
     mapping (address => uint) public wards;
-    function rely(address usr) external note auth { require(live, "TinlakeMgr/not-live"); wards[usr] = 1; }
-    function deny(address usr) external note auth { require(live, "TinlakeMgr/not-live"); wards[usr] = 0; }
+    function rely(address usr) external auth {
+        require(live, "TinlakeMgr/not-live");
+        wards[usr] = 1;
+        emit Rely(usr);
+    }
+    function deny(address usr) external auth {
+        require(live, "TinlakeMgr/not-live");
+        wards[usr] = 0;
+        emit Deny(usr);
+    }
     modifier auth {
         require(wards[msg.sender] == 1, "TinlakeMgr/not-authorized");
         _;
     }
 
-    modifier ownerOnly {
-        require(msg.sender == owner, "TinlakeMgr/owner-only");
+    modifier operatorOnly {
+        require(msg.sender == operator, "TinlakeMgr/operator-only");
         _;
     }
 
-    // The owner manages the cdp, but is not authorized to call kick or cage.
-    address public owner;
+    // Events
+    event Rely(address usr);
+    event Deny(address usr);
+    event Draw(uint wad);
+    event Wipe(uint wad);
+    event Join(uint wad);
+    event Exit(uint wad);
+    event NewOperator(address usr);
+    event Tell(uint wad);
+    event Unwind(uint payBack);
+    event Sink(uint ink, uint tab);
+    event Recover(uint recovered, uint payBack);
+    event Cage();
+    event Migrate(address dst);
+
+    // The operator manages the cdp, but is not authorized to call kick or cage.
+    address public operator;
 
     bool public safe; // Soft liquidation not triggered
     bool public glad; // Write-off not triggered
@@ -115,7 +137,7 @@ contract TinlakeManager is LibNote {
     constructor(address vat_,      address dai_,
                 address daiJoin_,  address vow_,
                 address drop_,     address pool_,
-                address owner_,    address tranche_,
+                address operator_,    address tranche_,
                 bytes32 ilk_) public {
 
         vat = VatLike(vat_);
@@ -129,7 +151,7 @@ contract TinlakeManager is LibNote {
         ilk = ilk_;
         wards[msg.sender] = 1;
 
-        owner = owner_;
+        operator = operator_;
 
         safe = true;
         live = true;
@@ -142,7 +164,7 @@ contract TinlakeManager is LibNote {
     }
 
     // --- Math ---
-    uint constant ONE = 10 ** 27;
+    uint constant RAY = 10 ** 27;
     function add(uint x, uint y) internal pure returns (uint z) {
         require((z = x + y) >= x);
     }
@@ -161,65 +183,72 @@ contract TinlakeManager is LibNote {
 
     // --- Vault Operation---
     // join & exit move the gem directly into/from the urn
-    function join(uint wad) public ownerOnly note {
+    function join(uint wad) public operatorOnly {
         require(safe && live);
         require(int(wad) >= 0, "TinlakeManager/overflow");
         gem.transferFrom(msg.sender, address(this), wad);
         vat.slip(ilk, address(this), int(wad));
         vat.frob(ilk, address(this), address(this), address(this), int(wad), 0);
+        emit Join(wad);
     }
 
-    function exit(uint wad) public ownerOnly note {
+    function exit(uint wad) public operatorOnly {
         require(safe && live);
         require(wad <= 2 ** 255, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this), -int(wad), 0);
         vat.slip(ilk, address(this), -int(wad));
         gem.transfer(msg.sender, wad);
+        emit Exit(wad);
     }
 
     // draw & wipe call daiJoin.exit/join immediately
-    function draw(uint wad) public ownerOnly note {
+    function draw(uint wad) public operatorOnly {
         require(safe && live);
         (, uint rate, , , ) = vat.ilks(ilk);
-        uint dart = divup(mul(ONE, wad), rate);
+        uint dart = divup(mul(RAY, wad), rate);
         require(int(dart) >= 0, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this), 0, int(dart));
         daiJoin.exit(msg.sender, wad);
+        emit Draw(wad);
     }
 
-    function wipe(uint wad) public ownerOnly note {
+    function wipe(uint wad) public operatorOnly {
         require(safe && live);
         dai.transferFrom(msg.sender, address(this), wad);
         daiJoin.join(address(this), wad);
         (,uint rate, , , ) = vat.ilks(ilk);
-        uint dart = mul(ONE, wad) / rate;
+        uint dart = mul(RAY, wad) / rate;
         require(dart <= 2 ** 255, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this), 0, -int(dart));
+        emit Wipe(wad);
     }
 
     // --- Administration ---
-    function setOwner(address newOwner) external ownerOnly note {
-        owner = newOwner;
+    function setOperator(address newOperator) external operatorOnly  {
+        operator = newOperator;
+        emit NewOperator(newOperator);
     }
 
-    function migrate(address dst) public auth note {
+    function migrate(address dst) public auth  {
         vat.hope(dst);
         dai.approve(dst, uint(-1));
         gem.approve(dst, uint(-1));
         live = false;
+        emit Migrate(dst);
     }
 
     // --- Liquidation ---
-    function tell() public note {
+    function tell() public {
         require(safe);
-        require(wards[msg.sender] == 1 || (msg.sender == owner && !live), "TinlakeManager/not-authorized");
+        require(wards[msg.sender] == 1 || (msg.sender == operator && !live), "TinlakeManager/not-authorized");
         (uint256 ink, ) = vat.urns(ilk, address(this));
         safe = false;
         gem.approve(tranche, ink);
         pool.redeemOrder(ink);
+        emit Tell(ink);
     }
 
-    function unwind(uint endEpoch) public note {
+    function unwind(uint endEpoch) public {
         require(!safe && glad && live, "TinlakeManager/not-soft-liquidation");
         (uint redeemed, , ,uint remainingDrop) = pool.disburse(endEpoch);
         (uint ink, ) = vat.urns(ilk, address(this));
@@ -229,24 +258,26 @@ contract TinlakeManager is LibNote {
         (, uint rate, , ,) = vat.ilks(ilk);
         (, uint art) = vat.urns(ilk, address(this));
         uint cdptab = mul(art, rate);
-        uint payBack = min(redeemed, divup(cdptab, ONE));
+        uint payBack = min(redeemed, divup(cdptab, RAY));
 
         daiJoin.join(address(this), payBack);
         // Repay dai debt up to the full amount
         // and exit the gems used up
-        uint dart = mul(ONE, payBack) / rate;
+        uint dart = mul(RAY, payBack) / rate;
         require(dart <= 2 ** 255, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this),
                  0, -int(dart));
         vat.grab(ilk, address(this), address(this), address(this),
                  -int(dropReturned), 0);
         vat.slip(ilk, address(this), -int(dropReturned));
-        // Return possible remainder to the owner
-        dai.transfer(owner, dai.balanceOf(address(this)));
+        // Return possible remainder to the operator
+        dai.transfer(operator, dai.balanceOf(address(this)));
+
+        emit Unwind(payBack);
     }
 
     // --- Writeoff ---
-    function sink() public note auth {
+    function sink() public auth {
         require(!safe && glad && live);
         (uint256 ink, uint256 art) = vat.urns(ilk, address(this));
         require(ink <= 2 ** 255, "TinlakeManager/overflow");
@@ -262,21 +293,24 @@ contract TinlakeManager is LibNote {
         tab = mul(rate, art);
         vow.fess(tab);
         glad = false;
+        emit Sink(ink, tab);
     }
 
-    function recover(uint endEpoch) public note {
+    function recover(uint endEpoch) public  {
         require(!glad, "TinlakeManager/not-written-off");
 
         (uint recovered, , ,) = pool.disburse(endEpoch);
-        uint payBack = min(recovered, tab / ONE);
+        uint payBack = min(recovered, tab / RAY);
         daiJoin.join(address(vow), payBack);
-        tab = sub(tab, mul(payBack, ONE));
-        dai.transfer(owner, dai.balanceOf(address(this)));
+        tab = sub(tab, mul(payBack, RAY));
+        dai.transfer(operator, dai.balanceOf(address(this)));
+        emit Recover(recovered, payBack);
     }
 
-    function cage() external note {
+    function cage() external {
         require(!glad);
         require(wards[msg.sender] == 1 || vat.live() == 0, "TinlakeManager/not-authorized");
         live = false;
+        emit Cage();
     }
 }
