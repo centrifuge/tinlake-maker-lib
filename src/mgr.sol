@@ -232,6 +232,7 @@ contract TinlakeManager {
     function migrate(address dst) public auth  {
         vat.hope(dst);
         dai.approve(dst, uint(-1));
+        // dst needs to be on the gem memberlist
         gem.approve(dst, uint(-1));
         live = false;
         emit Migrate(dst);
