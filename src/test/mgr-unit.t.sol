@@ -8,6 +8,7 @@ import { OperatorMock } from "./mocks/tinlake/operator.sol";
 import { SimpleToken } from "../../lib/tinlake/src/test/simple/token.sol";
 import { VatMock } from "./mocks/vat.sol";
 import { VowMock } from "./mocks/vow.sol";
+import { EndMock } from "./mocks/end.sol";
 import { DaiJoinMock } from "./mocks/daijoin.sol";
 import { SpotterMock } from "./mocks/spotter.sol";
 import { Dai } from "dss/dai.sol";
@@ -48,11 +49,13 @@ contract TinlakeManagerUnitTest is DSTest {
     SpotterMock spotter;
     VowMock vow;
     VatMock vat;
+    EndMock end;
     Dai dai;
     address dai_;
     address vat_;
     address daiJoin_;
     address vow_;
+    address end_;
     bytes32 constant ilk = "DROP"; // New Collateral Type
 
     // Tinlake
@@ -90,6 +93,7 @@ contract TinlakeManagerUnitTest is DSTest {
                                      seniorOperator_, // senior operator
                                      address(this),
                                      seniorTranche_, // senior tranche
+                                     end_,
                                      ilk);
         mgr_ = address(mgr);
         assertEq(vat.calls("hope"), 1);
@@ -110,6 +114,8 @@ contract TinlakeManagerUnitTest is DSTest {
         spotter = new SpotterMock();
         vow = new VowMock();
         vow_ = address(vow);
+        end = new EndMock();
+        end_ = address(end);
         self = address(this);
 
         // setup permissions
@@ -303,10 +309,7 @@ contract TinlakeManagerUnitTest is DSTest {
         uint tab = mul(vat.values_uint("rate"), art);
         assertEq(mgr.tab(), tab);
 
-        // assert fess was called with correct values
-        assertEq(vow.calls("fess"), 1);
-        assertEq(vow.values_uint("fess_tab"), tab);
-        // assert fess called
+        // assert sink called
         assert(!mgr.glad());
     }
 
@@ -320,6 +323,7 @@ contract TinlakeManagerUnitTest is DSTest {
                                     seniorOperator_, // senior operator
                                     address(this),
                                     seniorTranche_, // senior tranche
+                                    end_,
                                     ilk);
         address newMgr_ = address(newMgr);
 
@@ -354,6 +358,10 @@ contract TinlakeManagerUnitTest is DSTest {
         if (redeemedDAI > payBack) {
             surplus = sub(redeemedDAI, payBack);
         }
+        if (end.debt() > 0) {
+            surplus = redeemedDAI;
+            payBack = 0;
+        }
 
         assertEq(mgr.tab(), sub(mgrTab, mul(payBack, ONE)));
         assertEq(dai.balanceOf(self), add(operatorBalanceDAI, surplus));
@@ -367,15 +375,24 @@ contract TinlakeManagerUnitTest is DSTest {
     }
 
 
-    function failRecoverisGlad(uint redeemedDAI, uint epochId, uint art, uint ink) public {
+    function testFailRecoverisGlad(uint redeemedDAI, uint epochId, uint art, uint ink) public {
         recover(redeemedDAI, epochId);
     }
 
-    function failRecoverNotLive(uint redeemedDAI, uint epochId, uint art, uint ink) public {
+    function testRecoverNotLive(uint redeemedDAI, uint epochId, uint128 art, uint128 ink) public {
+        testSink(art, ink);
         // set live to false, call cage
         cage();
         // set glad to false & generate tab -> call sink
+        recover(redeemedDAI, epochId);
+    }
+
+    function testRecoverSettled(uint redeemedDAI, uint epochId, uint128 art, uint128 ink) public {
         testSink(art, ink);
+        // set live to false, call cage
+        cage();
+        end.setDebt(1);
+        // set glad to false & generate tab -> call sink
         recover(redeemedDAI, epochId);
     }
 
@@ -390,9 +407,7 @@ contract TinlakeManagerUnitTest is DSTest {
         migrate();
     }
 
-    function testSink(uint art, uint ink) public {
-        // make sure values are in valid range
-        if ((ink > 2 ** 128 ) || (art > 2 ** 128)) return;
+    function testSink(uint128 art, uint128 ink) public {
         // set safe to false, call tell
         tell();
         sink(art, ink);
@@ -430,16 +445,6 @@ contract TinlakeManagerUnitTest is DSTest {
         tell();
         // revoke auth permissions from vat
         vat.deny(mgr_);
-        sink(art, ink);
-    }
-
-    function testFailSinkNoVowAuth(uint art, uint ink) public {
-         // make sure values are in valid range
-        assert((ink <= 2 ** 128 ) && (art <= 2 ** 128));
-        // set safe to false, call tell
-        tell();
-        // revoke auth permissions from vow
-        vow.deny(mgr_);
         sink(art, ink);
     }
 
