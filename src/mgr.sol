@@ -115,7 +115,7 @@ contract TinlakeManager {
     bool public live; // Global settlement not triggered
 
     uint256 public tab;  // Dai written off
-    bytes32 public ilk; // Constant (TODO: hardcode)
+    bytes32 public ilk; // name of the collateral type
 
     // --- Contracts ---
     // These can all be hardcoded upon release.
