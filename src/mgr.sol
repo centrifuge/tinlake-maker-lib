@@ -79,7 +79,7 @@ contract TinlakeManager is LibNote {
         require(wards[msg.sender] == 1, "TinlakeMgr/not-authorized");
         _;
     }
-    
+
     modifier ownerOnly {
         require(msg.sender == owner, "TinlakeMgr/owner-only");
         _;
@@ -93,7 +93,7 @@ contract TinlakeManager is LibNote {
     bool public live; // Global settlement not triggered
 
     uint public tab;  // Dai written off
-    bytes32 public ilk; // Constant (TODO: hardcode)
+    bytes32 public ilk; // name of the collateral type
 
     // --- Contracts ---
     // These can all be hardcoded upon release.
@@ -110,10 +110,12 @@ contract TinlakeManager is LibNote {
 
     uint public constant dec = 18;
 
+    address public tranche;
+
     constructor(address vat_,      address dai_,
                 address daiJoin_,  address vow_,
                 address drop_,     address pool_,
-                address owner_,    address tranche,
+                address owner_,    address tranche_,
                 bytes32 ilk_) public {
 
         vat = VatLike(vat_);
@@ -135,8 +137,8 @@ contract TinlakeManager is LibNote {
 
         dai.approve(daiJoin_, uint(-1));
         vat.hope(daiJoin_);
-        gem.approve(pool_, uint(-1));
-        gem.approve(tranche, uint(-1));
+
+        tranche = tranche_;
     }
 
     // --- Math ---
@@ -209,10 +211,11 @@ contract TinlakeManager is LibNote {
 
     // --- Liquidation ---
     function tell() public note {
-        require(safe); 
+        require(safe);
         require(wards[msg.sender] == 1 || (msg.sender == owner && !live), "TinlakeManager/not-authorized");
         (uint256 ink, ) = vat.urns(ilk, address(this));
         safe = false;
+        gem.approve(tranche, ink);
         pool.redeemOrder(ink);
     }
 
