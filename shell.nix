@@ -2,7 +2,7 @@ let
   pkgs = import (builtins.fetchGit rec {
     name = "dapptools-${rev}";
     url = https://github.com/dapphub/dapptools;
-    rev = "9cc836c2d56d5ff2fd800f838cb172fd47e5622d";
+    rev = "dc992eb2e9d05bee150156add790bddb160fc80c";
   }) {};
 
 in
@@ -11,6 +11,6 @@ in
     name = "tinlake-maker-lib";
     buildInputs = with pkgs; [
       pkgs.dapp
-      pkgs.solc-versions.solc_0_5_15
+      pkgs.solc-static-versions.solc_0_5_15
     ];
   }
