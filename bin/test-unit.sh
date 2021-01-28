@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -e
 
-dapp test --fuzz-runs 500
+dapp --use solc:0.5.15 test --fuzz-runs 500

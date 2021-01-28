@@ -3,8 +3,8 @@ clean  :; dapp clean
 update:
 	dapp update
 build: update
-	dapp --use $$(which solc) build
+	dapp --use solc:0.5.15 build
 test: update
-	# dapp --use $$(which solc) test --rpc
-	dapp --use $$(which solc) test
-deploy :; dapp create TinlakeMakerLib
+	dapp --use solc:0.5.15 test
+deploy: build
+	dapp create TinlakeMakerLib
