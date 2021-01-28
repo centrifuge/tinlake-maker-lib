@@ -19,17 +19,17 @@
 pragma solidity >=0.5.12;
 
 interface GemLike {
-    function decimals() external view returns (uint);
-    function transfer(address,uint) external returns (bool);
-    function transferFrom(address,address,uint) external returns (bool);
-    function approve(address,uint) external returns (bool);
-    function totalSupply() external returns (uint);
-    function balanceOf(address) external returns (uint);
+    function decimals() external view returns (uint256);
+    function transfer(address,uint256) external returns (bool);
+    function transferFrom(address,address,uint256) external returns (bool);
+    function approve(address,uint256) external returns (bool);
+    function totalSupply() external returns (uint256);
+    function balanceOf(address) external returns (uint256);
 }
 
 interface GemJoinLike {
-    function join(address,uint) external;
-    function exit(address,uint) external;
+    function join(address,uint256) external;
+    function exit(address,uint256) external;
 }
 
 interface VowLike {
@@ -37,21 +37,21 @@ interface VowLike {
 }
 
 interface VatLike {
-    function live() external view returns (uint);
-    function slip(bytes32,address,int) external;
+    function live() external view returns (uint256);
+    function slip(bytes32,address,int256) external;
     function flux(bytes32,address,address,uint256) external;
-    function ilks(bytes32) external returns (uint,uint,uint,uint,uint);
-    function urns(bytes32,address) external returns (uint,uint);
-    function move(address,address,uint) external;
-    function frob(bytes32,address,address,address,int,int) external;
+    function ilks(bytes32) external returns (uint256,uint256,uint256,uint256,uint256);
+    function urns(bytes32,address) external returns (uint256,uint256);
+    function move(address,address,uint256) external;
+    function frob(bytes32,address,address,address,int256,int256) external;
     function grab(bytes32,address,address,address,int256,int256) external;
-    function gem(bytes32,address) external returns (uint);
+    function gem(bytes32,address) external returns (uint256);
     function hope(address) external;
 }
 
 interface RedeemLike {
-    function redeemOrder(uint) external;
-    function disburse(uint) external returns (uint,uint,uint,uint);
+    function redeemOrder(uint256) external;
+    function disburse(uint256) external returns (uint256,uint256,uint256,uint256);
 }
 
 // This contract is essentially a merge of
@@ -71,7 +71,7 @@ interface RedeemLike {
 
 contract TinlakeManager {
     // --- Auth ---
-    mapping (address => uint) public wards;
+     mapping (address => uint256) public wards;
     function rely(address usr) external auth {
         require(live, "TinlakeMgr/not-live");
         wards[usr] = 1;
@@ -114,8 +114,8 @@ contract TinlakeManager {
     bool public glad; // Write-off not triggered
     bool public live; // Global settlement not triggered
 
-    uint public tab;  // Dai written off
-    bytes32 public ilk; // name of the collateral type
+    uint256 public tab;  // Dai written off
+    bytes32 public ilk; // Constant (TODO: hardcode)
 
     // --- Contracts ---
     // These can all be hardcoded upon release.
@@ -130,7 +130,7 @@ contract TinlakeManager {
     GemLike      public tin;
     RedeemLike   public pool;
 
-    uint public constant dec = 18;
+    uint256 public constant dec = 18;
 
     address public tranche;
 
@@ -157,7 +157,7 @@ contract TinlakeManager {
         live = true;
         glad = true;
 
-        dai.approve(daiJoin_, uint(-1));
+        dai.approve(daiJoin_, uint256(-1));
         vat.hope(daiJoin_);
 
         tranche = tranche_;
@@ -168,58 +168,58 @@ contract TinlakeManager {
     function add(uint x, uint y) internal pure returns (uint z) {
         require((z = x + y) >= x);
     }
-    function sub(uint x, uint y) internal pure returns (uint z) {
+    function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
         require((z = x - y) <= x);
     }
-    function mul(uint x, uint y) internal pure returns (uint z) {
+    function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
         require(y == 0 || (z = x * y) / y == x);
     }
-    function divup(uint x, uint y) internal pure returns (uint z) {
+    function divup(uint256 x, uint256 y) internal pure returns (uint256 z) {
         z = add(x, sub(y, 1)) / y;
     }
-    function min(uint x, uint y) internal pure returns (uint z) {
+    function min(uint256 x, uint256 y) internal pure returns (uint256 z) {
         z = x > y ? y : x;
     }
 
     // --- Vault Operation---
     // join & exit move the gem directly into/from the urn
-    function join(uint wad) public operatorOnly {
+    function join(uint256 wad) public operatorOnly {
         require(safe && live);
-        require(int(wad) >= 0, "TinlakeManager/overflow");
+        require(int256(wad) >= 0, "TinlakeManager/overflow");
         gem.transferFrom(msg.sender, address(this), wad);
-        vat.slip(ilk, address(this), int(wad));
-        vat.frob(ilk, address(this), address(this), address(this), int(wad), 0);
+        vat.slip(ilk, address(this), int256(wad));
+        vat.frob(ilk, address(this), address(this), address(this), int256(wad), 0);
         emit Join(wad);
     }
 
-    function exit(uint wad) public operatorOnly {
+    function exit(uint256 wad) public operatorOnly {
         require(safe && live);
         require(wad <= 2 ** 255, "TinlakeManager/overflow");
-        vat.frob(ilk, address(this), address(this), address(this), -int(wad), 0);
-        vat.slip(ilk, address(this), -int(wad));
+        vat.frob(ilk, address(this), address(this), address(this), -int256(wad), 0);
+        vat.slip(ilk, address(this), -int256(wad));
         gem.transfer(msg.sender, wad);
         emit Exit(wad);
     }
 
     // draw & wipe call daiJoin.exit/join immediately
-    function draw(uint wad) public operatorOnly {
+    function draw(uint256 wad) public operatorOnly {
         require(safe && live);
-        (, uint rate, , , ) = vat.ilks(ilk);
-        uint dart = divup(mul(RAY, wad), rate);
-        require(int(dart) >= 0, "TinlakeManager/overflow");
-        vat.frob(ilk, address(this), address(this), address(this), 0, int(dart));
+        (, uint256 rate, , , ) = vat.ilks(ilk);
+        uint256 dart = divup(mul(RAY, wad), rate);
+        require(int256(dart) >= 0, "TinlakeManager/overflow");
+        vat.frob(ilk, address(this), address(this), address(this), 0, int256(dart));
         daiJoin.exit(msg.sender, wad);
         emit Draw(wad);
     }
 
-    function wipe(uint wad) public operatorOnly {
+    function wipe(uint256 wad) public operatorOnly {
         require(safe && live);
         dai.transferFrom(msg.sender, address(this), wad);
         daiJoin.join(address(this), wad);
-        (,uint rate, , , ) = vat.ilks(ilk);
-        uint dart = mul(RAY, wad) / rate;
+        (,uint256 rate, , , ) = vat.ilks(ilk);
+        uint256 dart = mul(RAY, wad) / rate;
         require(dart <= 2 ** 255, "TinlakeManager/overflow");
-        vat.frob(ilk, address(this), address(this), address(this), 0, -int(dart));
+        vat.frob(ilk, address(this), address(this), address(this), 0, -int256(dart));
         emit Wipe(wad);
     }
 
@@ -231,8 +231,8 @@ contract TinlakeManager {
 
     function migrate(address dst) public auth  {
         vat.hope(dst);
-        dai.approve(dst, uint(-1));
-        gem.approve(dst, uint(-1));
+        dai.approve(dst, uint256(-1));
+        gem.approve(dst, uint256(-1));
         live = false;
         emit Migrate(dst);
     }
@@ -248,31 +248,29 @@ contract TinlakeManager {
         emit Tell(ink);
     }
 
-    function unwind(uint endEpoch) public {
+    function unwind(uint256 endEpoch) public {
         require(!safe && glad && live, "TinlakeManager/not-soft-liquidation");
-        (uint redeemed, , ,uint remainingDrop) = pool.disburse(endEpoch);
-        (uint ink, ) = vat.urns(ilk, address(this));
-        uint dropReturned = sub(ink, remainingDrop);
+        (uint256 redeemed, , ,uint256 remainingDrop) = pool.disburse(endEpoch);
+        (uint256 ink, uint256 art) = vat.urns(ilk, address(this));
+        uint256 dropReturned = sub(ink, remainingDrop);
         require(dropReturned <= 2 ** 255, "TinlakeManager/overflow");
 
-        (, uint rate, , ,) = vat.ilks(ilk);
-        (, uint art) = vat.urns(ilk, address(this));
-        uint cdptab = mul(art, rate);
-        uint payBack = min(redeemed, divup(cdptab, RAY));
+        (, uint256 rate, , ,) = vat.ilks(ilk);
+        uint256 cdptab = mul(art, rate);
+        uint256 payBack = min(redeemed, divup(cdptab, RAY));
 
         daiJoin.join(address(this), payBack);
         // Repay dai debt up to the full amount
         // and exit the gems used up
-        uint dart = mul(RAY, payBack) / rate;
+        uint256 dart = mul(RAY, payBack) / rate;
         require(dart <= 2 ** 255, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this),
-                 0, -int(dart));
+                 0, -int256(dart));
         vat.grab(ilk, address(this), address(this), address(this),
-                 -int(dropReturned), 0);
-        vat.slip(ilk, address(this), -int(dropReturned));
-        // Return possible remainder to the operator
+                 -int256(dropReturned), 0);
+        vat.slip(ilk, address(this), -int256(dropReturned));
+        // Return possible remainder to the owner
         dai.transfer(operator, dai.balanceOf(address(this)));
-
         emit Unwind(payBack);
     }
 
@@ -282,25 +280,25 @@ contract TinlakeManager {
         (uint256 ink, uint256 art) = vat.urns(ilk, address(this));
         require(ink <= 2 ** 255, "TinlakeManager/overflow");
         require(art <= 2 ** 255, "TinlakeManager/overflow");
-        (, uint rate, , ,) = vat.ilks(ilk);
+        (, uint256 rate, , ,) = vat.ilks(ilk);
         vat.grab(ilk,
                  address(this),
                  address(this),
                  address(vow),
-                 -int(ink),
-                 -int(art));
-        vat.slip(ilk, address(this), -int(ink));
+                 -int256(ink),
+                 -int256(art));
+        vat.slip(ilk, address(this), -int256(ink));
         tab = mul(rate, art);
         vow.fess(tab);
         glad = false;
         emit Sink(ink, tab);
     }
 
-    function recover(uint endEpoch) public  {
+    function recover(uint256 endEpoch) public {
         require(!glad, "TinlakeManager/not-written-off");
 
-        (uint recovered, , ,) = pool.disburse(endEpoch);
-        uint payBack = min(recovered, tab / RAY);
+        (uint256 recovered, , ,) = pool.disburse(endEpoch);
+        uint256 payBack = min(recovered, tab / RAY);
         daiJoin.join(address(vow), payBack);
         tab = sub(tab, mul(payBack, RAY));
         dai.transfer(operator, dai.balanceOf(address(this)));
