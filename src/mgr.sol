@@ -87,8 +87,8 @@ contract TinlakeManager {
         _;
     }
 
-    modifier ownerOnly {
-        require(msg.sender == owner, "TinlakeMgr/owner-only");
+    modifier operatorOnly {
+        require(msg.sender == operator, "TinlakeMgr/operator-only");
         _;
     }
 
@@ -99,7 +99,7 @@ contract TinlakeManager {
     event Wipe(uint wad);
     event Join(uint wad);
     event Exit(uint wad);
-    event NewOwner(address usr);
+    event NewOperator(address usr);
     event Tell(uint wad);
     event Unwind(uint payBack);
     event Sink(uint ink, uint tab);
@@ -107,8 +107,8 @@ contract TinlakeManager {
     event Cage();
     event Migrate(address dst);
 
-    // The owner manages the cdp, but is not authorized to call kick or cage.
-    address public owner;
+    // The operator manages the cdp, but is not authorized to call kick or cage.
+    address public operator;
 
     bool public safe; // Soft liquidation not triggered
     bool public glad; // Write-off not triggered
@@ -137,7 +137,7 @@ contract TinlakeManager {
     constructor(address vat_,      address dai_,
                 address daiJoin_,  address vow_,
                 address drop_,     address pool_,
-                address owner_,    address tranche_,
+                address operator_,    address tranche_,
                 bytes32 ilk_) public {
 
         vat = VatLike(vat_);
@@ -151,7 +151,7 @@ contract TinlakeManager {
         ilk = ilk_;
         wards[msg.sender] = 1;
 
-        owner = owner_;
+        operator = operator_;
 
         safe = true;
         live = true;
@@ -183,7 +183,7 @@ contract TinlakeManager {
 
     // --- Vault Operation---
     // join & exit move the gem directly into/from the urn
-    function join(uint wad) public ownerOnly {
+    function join(uint wad) public operatorOnly {
         require(safe && live);
         require(int(wad) >= 0, "TinlakeManager/overflow");
         gem.transferFrom(msg.sender, address(this), wad);
@@ -192,7 +192,7 @@ contract TinlakeManager {
         emit Join(wad);
     }
 
-    function exit(uint wad) public ownerOnly {
+    function exit(uint wad) public operatorOnly {
         require(safe && live);
         require(wad <= 2 ** 255, "TinlakeManager/overflow");
         vat.frob(ilk, address(this), address(this), address(this), -int(wad), 0);
@@ -202,7 +202,7 @@ contract TinlakeManager {
     }
 
     // draw & wipe call daiJoin.exit/join immediately
-    function draw(uint wad) public ownerOnly {
+    function draw(uint wad) public operatorOnly {
         require(safe && live);
         (, uint rate, , , ) = vat.ilks(ilk);
         uint dart = divup(mul(RAY, wad), rate);
@@ -212,7 +212,7 @@ contract TinlakeManager {
         emit Draw(wad);
     }
 
-    function wipe(uint wad) public ownerOnly {
+    function wipe(uint wad) public operatorOnly {
         require(safe && live);
         dai.transferFrom(msg.sender, address(this), wad);
         daiJoin.join(address(this), wad);
@@ -224,9 +224,9 @@ contract TinlakeManager {
     }
 
     // --- Administration ---
-    function setOwner(address newOwner) external ownerOnly  {
-        owner = newOwner;
-        emit NewOwner(newOwner);
+    function setOperator(address newOperator) external operatorOnly  {
+        operator = newOperator;
+        emit NewOperator(newOperator);
     }
 
     function migrate(address dst) public auth  {
@@ -240,7 +240,7 @@ contract TinlakeManager {
     // --- Liquidation ---
     function tell() public {
         require(safe);
-        require(wards[msg.sender] == 1 || (msg.sender == owner && !live), "TinlakeManager/not-authorized");
+        require(wards[msg.sender] == 1 || (msg.sender == operator && !live), "TinlakeManager/not-authorized");
         (uint256 ink, ) = vat.urns(ilk, address(this));
         safe = false;
         gem.approve(tranche, ink);
@@ -270,8 +270,8 @@ contract TinlakeManager {
         vat.grab(ilk, address(this), address(this), address(this),
                  -int(dropReturned), 0);
         vat.slip(ilk, address(this), -int(dropReturned));
-        // Return possible remainder to the owner
-        dai.transfer(owner, dai.balanceOf(address(this)));
+        // Return possible remainder to the operator
+        dai.transfer(operator, dai.balanceOf(address(this)));
 
         emit Unwind(payBack);
     }
@@ -303,7 +303,7 @@ contract TinlakeManager {
         uint payBack = min(recovered, tab / RAY);
         daiJoin.join(address(vow), payBack);
         tab = sub(tab, mul(payBack, RAY));
-        dai.transfer(owner, dai.balanceOf(address(this)));
+        dai.transfer(operator, dai.balanceOf(address(this)));
         emit Recover(recovered, payBack);
     }
 
