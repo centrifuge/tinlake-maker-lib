@@ -118,7 +118,6 @@ contract TinlakeManager {
     bytes32 public ilk; // name of the collateral type
 
     // --- Contracts ---
-    // These can all be hardcoded upon release.
     // dss components
     VatLike public vat;
     GemLike public dai;
@@ -232,6 +231,7 @@ contract TinlakeManager {
     function migrate(address dst) public auth  {
         vat.hope(dst);
         dai.approve(dst, uint(-1));
+        // dst needs to be on the gem memberlist
         gem.approve(dst, uint(-1));
         live = false;
         emit Migrate(dst);
