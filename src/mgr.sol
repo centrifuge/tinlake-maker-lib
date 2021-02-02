@@ -71,7 +71,7 @@ interface RedeemLike {
 
 contract TinlakeManager {
     // --- Auth ---
-     mapping (address => uint256) public wards;
+    mapping (address => uint256) public wards;
     function rely(address usr) external auth {
         require(live, "TinlakeMgr/not-live");
         wards[usr] = 1;
@@ -95,18 +95,18 @@ contract TinlakeManager {
     // Events
     event Rely(address usr);
     event Deny(address usr);
-    event Draw(uint wad);
-    event Wipe(uint wad);
-    event Join(uint wad);
-    event Exit(uint wad);
-    event NewOperator(address usr);
-    event Tell(uint wad);
-    event Unwind(uint payBack);
-    event Sink(uint ink, uint tab);
-    event Recover(uint recovered, uint payBack);
+    event Draw(uint256 wad);
+    event Wipe(uint256 wad);
+    event Join(uint256 wad);
+    event Exit(uint256 wad);
+    event SetOperator(address indexed usr);
+    event Tell(uint256 wad);
+    event Unwind(uint256 payBack);
+    event Sink(uint256 ink, uint256 tab);
+    event Recover(uint256 recovered, uint256 payBack);
     event Cage();
-    event File(bytes32 what, address data);
-    event Migrate(address dst);
+    event File(bytes32 indexed what, address indexed data);
+    event Migrate(address indexed dst);
 
     // The operator manages the cdp, but is not authorized to call kick or cage.
     address public operator;
@@ -167,8 +167,8 @@ contract TinlakeManager {
     }
 
     // --- Math ---
-    uint constant RAY = 10 ** 27;
-    function add(uint x, uint y) internal pure returns (uint z) {
+    uint256 constant RAY = 10 ** 27;
+    function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
         require((z = x + y) >= x);
     }
     function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
@@ -229,7 +229,7 @@ contract TinlakeManager {
     // --- Administration ---
     function setOperator(address newOperator) external operatorOnly  {
         operator = newOperator;
-        emit NewOperator(newOperator);
+        emit SetOperator(newOperator);
     }
 
     function migrate(address dst) public auth  {
@@ -244,7 +244,7 @@ contract TinlakeManager {
         require(live, "TinlakeManager/not-live");
         emit File(what, data);
         if (what == "vow") vow = data;
-        else if (what == "join") daiJoin = JoinLike(data);
+        else if (what == "daiJoin") daiJoin = JoinLike(data);
         else if (what == "end")  end = EndLike(data);
         else revert("Vat/file-unrecognized-param");
     }
