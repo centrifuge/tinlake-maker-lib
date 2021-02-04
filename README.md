@@ -14,6 +14,9 @@ pool.disburse().
 This is essentially a write off of the debt of the vault
 
 
+## State Diagram
+![](state-diagram.png) 
+
 # Spell
 
 A mainnet targeted spell, integrating the manager and the drop token into maker
