@@ -93,8 +93,8 @@ contract TinlakeManager {
     }
 
     // Events
-    event Rely(address usr);
-    event Deny(address usr);
+    event Rely(address indexed usr);
+    event Deny(address indexed usr);
     event Draw(uint256 wad);
     event Wipe(uint256 wad);
     event Join(uint256 wad);
