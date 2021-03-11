@@ -149,6 +149,7 @@ contract TinlakeManager {
         vow = vow_;
 
         gem = GemLike(drop_);
+        require(gem.decimals() == dec, "TinlakeMgr/decimals-dont-match");
         pool = RedeemLike(pool_);
 
         ilk = ilk_;
