@@ -153,6 +153,7 @@ contract TinlakeManager {
 
         ilk = ilk_;
         wards[msg.sender] = 1;
+        emit Rely(msg.sender);
 
         operator = operator_;
 
