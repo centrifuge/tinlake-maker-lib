@@ -12,7 +12,7 @@ import { EndMock } from "./mocks/end.sol";
 import { DaiJoinMock } from "./mocks/daijoin.sol";
 import { SpotterMock } from "./mocks/spotter.sol";
 import { Dai } from "dss/dai.sol";
-import "ds-test/test.sol";
+import "../../lib/dss/lib/ds-test/src/test.sol";
 
 interface Hevm {
     function warp(uint) external;
