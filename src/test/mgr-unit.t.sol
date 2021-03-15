@@ -100,6 +100,6 @@ contract TinlakeManagerUnitTest is DSTest {
     }
 
     function testDeploy() public {
-        
+
     }
 }

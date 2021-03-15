@@ -134,7 +134,7 @@ contract TinlakeManager {
     GemLike      public rwaToken;
     RedeemLike   public pool;
 
-    // MIP21
+    // MIP21 RWAUrn
     MIP21UrnLike public urn;
 
     uint256 public constant dec = 18;
@@ -166,6 +166,7 @@ contract TinlakeManager {
         glad = true;
         live = false;
 
+        // rwaUrn allowance for rwaToken
         rwaToken.approve(address(urn), uint(-1));
         tranche = tranche_;
     }
@@ -189,6 +190,8 @@ contract TinlakeManager {
     }
 
 
+    // moves the rwaToken into the vault
+    // requires that mgr contract holds the rwaToken
     function lock(uint wad) public operatorOnly {
         require(vat.live() == 1, "TinlakeManager/mkr-in-ES");
         urn.lock(wad);
@@ -255,6 +258,8 @@ contract TinlakeManager {
     }
 
     // --- Liquidation ---
+    // triggers a soft liquidation of the DROP collateral
+    // a redeemOrder is submitted to receive DAI back
     function tell() public auth {
         require(safe, "TinlakeManager/not-safe");
         uint256 ink = gem.balanceOf(address(this));
@@ -264,6 +269,9 @@ contract TinlakeManager {
         emit Tell(ink);
     }
 
+    // triggers the payout of a DROP redemption
+    // method can be called multiple times after the liquidation until all
+    // DROP tokens are redeemed
     function unwind(uint256 endEpoch) public {
         require(!safe && glad && live, "TinlakeManager/not-soft-liquidation");
         (uint256 redeemed, , ,uint256 remainingDrop) = pool.disburse(endEpoch);
@@ -281,8 +289,8 @@ contract TinlakeManager {
         emit Unwind(payBack);
     }
 
-    // --- Writeoff ---
-    // method should be called before urn.cull call
+    // --- Write-off ---
+    // method should be called before RwaLiquidationOracle.cull()
     function sink() public auth {
         require(!safe && glad && live, "TinlakeManager/bad-state");
         (, uint256 art) = vat.urns(ilk, address(urn));
