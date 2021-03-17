@@ -94,7 +94,7 @@ contract TinlakeManager {
     address public governance;
 
     modifier governanceOnly {
-        require(msg.sender == operator, "TinlakeMgr/governance-only");
+        require(msg.sender == governance, "TinlakeMgr/governance-only");
         _;
     }
 
@@ -105,7 +105,6 @@ contract TinlakeManager {
     event Wipe(uint256 wad);
     event Join(uint256 wad);
     event Exit(uint256 wad);
-    event SetOperator(address indexed usr);
     event Tell(uint256 wad);
     event Unwind(uint256 payBack);
     event Sink(uint256 tab);
@@ -140,15 +139,17 @@ contract TinlakeManager {
     uint256 public constant dec = 18;
 
     address public tranche;
+    address public owner;
 
     constructor(address dai_,        address daiJoin_,
                 address drop_,       address pool_,
-                address governance_, address tranche_,
-                address end_,        bytes32 ilk_
+                address governance_, address owner_,
+                address tranche_,    address end_,
+                bytes32 ilk_
                 ) public {
 
         dai = GemLike(dai_);
-        daiJoin = GemLike(daiJoin_);
+        daiJoin = JoinLike(daiJoin_);
         end = EndLike(end_);
         gem = GemLike(drop_);
         require(gem.decimals() == dec, "TinlakeMgr/decimals-dont-match");
@@ -159,6 +160,7 @@ contract TinlakeManager {
         wards[msg.sender] = 1;
         emit Rely(msg.sender);
         governance = governance_;
+        owner = owner_;
 
         safe = true;
         glad = true;
@@ -243,6 +245,9 @@ contract TinlakeManager {
             urn = MIP21UrnLike(data);
             dai.approve(data, uint256(-1));
         }
+        else if (what == "owner") {
+            owner = data;
+        }
         else if (what == "rwaToken") {
             rwaToken = GemLike(data);
             require(rwaToken.decimals() == dec, "TinlakeMgr/decimals-dont-match");
@@ -278,7 +283,7 @@ contract TinlakeManager {
         urn.wipe(payBack);
 
         // Return possible remainder to the owner
-        dai.transfer(operator, dai.balanceOf(address(this)));
+        dai.transfer(owner, dai.balanceOf(address(this)));
         emit Unwind(payBack);
     }
 
@@ -305,7 +310,7 @@ contract TinlakeManager {
             daiJoin.join(address(vow), payBack);
             tab = sub(tab, mul(payBack, RAY));
         }
-        dai.transfer(operator, dai.balanceOf(address(this)));
+        dai.transfer(owner, dai.balanceOf(address(this)));
         emit Recover(recovered, payBack);
     }
 
