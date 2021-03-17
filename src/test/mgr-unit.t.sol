@@ -75,28 +75,46 @@ contract TinlakeManagerUnitTest is DSTest {
     uint rate;
 
     function setUp() public {
-//        mkrDeploy();
-//        drop = new SimpleToken("DROP", "Tinlake DROP Token");
-//        drop_ = address(drop);
-//        seniorTranche = new TrancheMock();
-//        seniorTranche_ = address(seniorTranche);
-//        seniorOperator = new OperatorMock(dai_);
-//        seniorOperator_ = address(seniorOperator);
-//        seniorTranche.depend("token", drop_);
-//
-//        // deploy mgr
-//        mgr = new TinlakeManager(address(vat),
-//                                     dai_,
-//                                     daiJoin_,
-//                                     vow_,
-//                                     drop_, // DROP token
-//                                     seniorOperator_, // senior operator
-//                                     address(this),
-//                                     seniorTranche_, // senior tranche
-//                                     end_,
-//                                     ilk);
-//        mgr_ = address(mgr);
+        mkrDeploy();
+        drop = new SimpleToken("DROP", "Tinlake DROP Token");
+        drop_ = address(drop);
+        seniorTranche = new TrancheMock();
+        seniorTranche_ = address(seniorTranche);
+        seniorOperator = new OperatorMock(dai_);
+        seniorOperator_ = address(seniorOperator);
+        seniorTranche.depend("token", drop_);
 
+        // deploy mgr
+        mgr = new TinlakeManager(dai_,
+                                 daiJoin_,
+                                 drop_, // DROP token
+                                 seniorOperator_, // senior operator
+                                 address(this),
+                                 address(this), // senior tranche
+                                 seniorTranche_,
+                                 end_,
+                                 ilk);
+        mgr_ = address(mgr);
+
+    }
+
+    // creates all relevant mkr contracts to test the mgr
+    function mkrDeploy() public {
+        dai = new Dai(0);
+        dai_ = address(dai);
+        vat = new VatMock();
+        vat_ = address(vat);
+        daiJoin = new DaiJoinMock(dai_);
+        daiJoin_ = address(daiJoin);
+        spotter = new SpotterMock();
+        vow = new VowMock();
+        vow_ = address(vow);
+        end = new EndMock();
+        end_ = address(end);
+        self = address(this);
+
+        // setup permissions
+        dai.rely(daiJoin_);
     }
 
     function testDeploy() public {
