@@ -90,8 +90,11 @@ contract TinlakeManager {
         _;
     }
 
-    modifier operatorOnly {
-        require(msg.sender == operator, "TinlakeMgr/operator-only");
+    // Maker Governance is authorized call tell and unwind.
+    address public governance;
+
+    modifier governanceOnly {
+        require(msg.sender == operator, "TinlakeMgr/governance-only");
         _;
     }
 
@@ -110,9 +113,6 @@ contract TinlakeManager {
     event Cage();
     event File(bytes32 indexed what, address indexed data);
     event Migrate(address indexed dst);
-
-    // The operator manages the cdp, but is not authorized to call kick or cage.
-    address public operator;
 
     bool public safe; // Soft liquidation not triggered
     bool public glad; // Write-off not triggered
@@ -141,33 +141,29 @@ contract TinlakeManager {
 
     address public tranche;
 
-    constructor(address dai_,      address rwaToken_,
-                address drop_,     address pool_,
-                address operator_, address tranche_,
-                address end_,      bytes32 ilk_
+    constructor(address dai_,        address daiJoin_,
+                address drop_,       address pool_,
+                address governance_, address tranche_,
+                address end_,        bytes32 ilk_
                 ) public {
 
         dai = GemLike(dai_);
+        daiJoin = GemLike(daiJoin_);
         end = EndLike(end_);
         gem = GemLike(drop_);
-        rwaToken = GemLike(rwaToken_);
-
-
         require(gem.decimals() == dec, "TinlakeMgr/decimals-dont-match");
-        require(rwaToken.decimals() == dec, "TinlakeMgr/decimals-dont-match");
+
         pool = RedeemLike(pool_);
 
         ilk = ilk_;
         wards[msg.sender] = 1;
         emit Rely(msg.sender);
-        operator = operator_;
+        governance = governance_;
 
         safe = true;
         glad = true;
-        live = false;
+        live = true;
 
-        // rwaUrn allowance for rwaToken
-        rwaToken.approve(address(urn), uint(-1));
         tranche = tranche_;
     }
 
@@ -192,22 +188,22 @@ contract TinlakeManager {
 
     // moves the rwaToken into the vault
     // requires that mgr contract holds the rwaToken
-    function lock(uint wad) public operatorOnly {
+    function lock(uint256 wad) public auth {
         require(vat.live() == 1, "TinlakeManager/mkr-in-ES");
+        rwaToken.approve(address(urn), uint256(wad));
         urn.lock(wad);
-        live = true;
     }
 
     // --- Vault Operation---
     // join & exit move the gem directly into/from the urn
-    function join(uint256 wad) public operatorOnly {
+    function join(uint256 wad) public auth {
         require(safe && live, "TinlakeManager/bad-state");
         require(int256(wad) >= 0, "TinlakeManager/overflow");
         gem.transferFrom(msg.sender, address(this), wad);
         emit Join(wad);
     }
 
-    function exit(uint256 wad) public operatorOnly {
+    function exit(uint256 wad) public auth {
         require(safe && live, "TinlakeManager/bad-state");
         require(wad <= 2 ** 255, "TinlakeManager/overflow");
         gem.transfer(msg.sender, wad);
@@ -215,31 +211,26 @@ contract TinlakeManager {
     }
 
     // draw & wipe call daiJoin.exit/join immediately
-    function draw(uint256 wad) public operatorOnly {
+    function draw(uint256 wad) public auth {
         require(safe && live, "TinlakeManager/bad-state");
         urn.draw(wad);
         dai.transferFrom(address(this), msg.sender, wad);
         emit Draw(wad);
     }
 
-    function wipe(uint256 wad) public operatorOnly {
+    function wipe(uint256 wad) public {
         require(safe && live, "TinlakeManager/bad-state");
         dai.transferFrom(msg.sender, address(this), wad);
         urn.wipe(wad);
         emit Wipe(wad);
     }
 
-    function free(uint256 wad)  public operatorOnly {
+    function free(uint256 wad) public auth {
         urn.quit();
     }
 
     // --- Administration ---
-    function setOperator(address newOperator) external operatorOnly  {
-        operator = newOperator;
-        emit SetOperator(newOperator);
-    }
-
-    function migrate(address dst) public auth  {
+    function migrate(address dst) public auth {
         dai.approve(dst, uint256(-1));
         gem.approve(dst, uint256(-1));
         live = false;
@@ -248,20 +239,22 @@ contract TinlakeManager {
 
     function file(bytes32 what, address data) public auth {
         emit File(what, data);
-        if (what == "daiJoin") daiJoin = JoinLike(data);
-        else if (what == "end")  end = EndLike(data);
-        else if (what == "urn") {
+        if (what == "urn") {
             urn = MIP21UrnLike(data);
             dai.approve(data, uint256(-1));
         }
-        else revert("Vat/file-unrecognized-param");
+        else if (what == "rwaToken") {
+            rwaToken = GemLike(data);
+            require(rwaToken.decimals() == dec, "TinlakeMgr/decimals-dont-match");
+        }
+        else revert("TinlakeMgr/file-unknown-param");
     }
 
     // --- Liquidation ---
     // triggers a soft liquidation of the DROP collateral
     // a redeemOrder is submitted to receive DAI back
-    function tell() public auth {
-        require(safe, "TinlakeManager/not-safe");
+    function tell() public governanceOnly {
+        require(safe, "TinlakeMgr/not-safe");
         uint256 ink = gem.balanceOf(address(this));
         safe = false;
         gem.approve(tranche, ink);
@@ -273,7 +266,7 @@ contract TinlakeManager {
     // method can be called multiple times after the liquidation until all
     // DROP tokens are redeemed
     function unwind(uint256 endEpoch) public {
-        require(!safe && glad && live, "TinlakeManager/not-soft-liquidation");
+        require(!safe && glad && live, "TinlakeMgr/not-soft-liquidation");
         (uint256 redeemed, , ,uint256 remainingDrop) = pool.disburse(endEpoch);
         // here we use the urn instead of address(this)
         (, uint256 art) = vat.urns(ilk, address(urn));
@@ -291,10 +284,10 @@ contract TinlakeManager {
 
     // --- Write-off ---
     // method should be called before RwaLiquidationOracle.cull()
-    function sink() public auth {
-        require(!safe && glad && live, "TinlakeManager/bad-state");
+    function sink() public governanceOnly {
+        require(!safe && glad && live, "TinlakeMgr/bad-state");
         (, uint256 art) = vat.urns(ilk, address(urn));
-        require(art <= 2 ** 255, "TinlakeManager/overflow");
+        require(art <= 2 ** 255, "TinlakeMgr/overflow");
         (, uint256 rate, , ,) = vat.ilks(ilk);
 
         tab = mul(rate, art);
@@ -303,7 +296,7 @@ contract TinlakeManager {
     }
 
     function recover(uint256 endEpoch) public {
-        require(!glad, "TinlakeManager/not-written-off");
+        require(!glad, "TinlakeMgr/not-written-off");
 
         (uint256 recovered, , ,) = pool.disburse(endEpoch);
         uint256 payBack;
@@ -317,8 +310,8 @@ contract TinlakeManager {
     }
 
     function cage() external {
-        require(!glad, "TinlakeManager/bad-state");
-        require(wards[msg.sender] == 1 || vat.live() == 0, "TinlakeManager/not-authorized");
+        require(!glad, "TinlakeMgr/bad-state");
+        require(wards[msg.sender] == 1 || vat.live() == 0, "TinlakeMgr/not-authorized");
         live = false;
         emit Cage();
     }
