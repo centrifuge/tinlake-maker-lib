@@ -76,12 +76,10 @@ contract TinlakeManager {
     // --- Auth ---
     mapping (address => uint256) public wards;
     function rely(address usr) external auth {
-        require(live, "TinlakeMgr/not-live");
         wards[usr] = 1;
         emit Rely(usr);
     }
     function deny(address usr) external auth {
-        require(live, "TinlakeMgr/not-live");
         wards[usr] = 0;
         emit Deny(usr);
     }
@@ -90,7 +88,7 @@ contract TinlakeManager {
         _;
     }
 
-    // Maker Governance is authorized call tell and unwind.
+    // Maker Governance is authorized call tell, unwind, and migrate.
     address public governance;
 
     modifier governanceOnly {
@@ -232,7 +230,9 @@ contract TinlakeManager {
     }
 
     // --- Administration ---
-    function migrate(address dst) public auth {
+    function migrate(address dst) public {
+        require(msg.sender == governance || wards[msg.sender] == 1, "TinlakeMgr/auth-or-gov-only");
+
         dai.approve(dst, uint256(-1));
         gem.approve(dst, uint256(-1));
         live = false;
