@@ -11,10 +11,10 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-pragma solidity >=0.5.15 <0.6.0;
+pragma solidity >=0.5.12 <0.6.0;
 import "ds-test/test.sol";
 
-import "../../../lib/tinlake/src/test/mock/mock.sol";
+import "./mock.sol";
 import "./auth.sol";
 
 contract VowMock is Mock, Auth {
@@ -25,7 +25,7 @@ contract VowMock is Mock, Auth {
     }
 
     function fess(uint tab) external auth {
-        calls["fess"]++;  
+        calls["fess"]++;
         values_uint["fess_tab"] = tab;
     }
 

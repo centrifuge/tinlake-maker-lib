@@ -16,7 +16,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity >=0.5.15 <0.6.0;
+pragma solidity >=0.5.12 <0.6.0;
 
 interface GemLike {
     function decimals() external view returns (uint256);
@@ -143,11 +143,12 @@ contract TinlakeManager {
                 address drop_,       address pool_,
                 address governance_, address owner_,
                 address tranche_,    address end_,
-                bytes32 ilk_
+                address vat_,        bytes32 ilk_
                 ) public {
 
         dai = GemLike(dai_);
         daiJoin = JoinLike(daiJoin_);
+        vat = VatLike(vat_);
         end = EndLike(end_);
         gem = GemLike(drop_);
         require(gem.decimals() == dec, "TinlakeMgr/decimals-dont-match");
@@ -250,7 +251,6 @@ contract TinlakeManager {
         }
         else if (what == "rwaToken") {
             rwaToken = GemLike(data);
-            require(rwaToken.decimals() == dec, "TinlakeMgr/decimals-dont-match");
         }
         else revert("TinlakeMgr/file-unknown-param");
     }
