@@ -99,6 +99,8 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
 
     function setUp() public {
         hevm.warp(604411200);
+        self = address(this);
+
         dai = new DSToken("DAI");
         dai_ = address(dai);
 
@@ -186,8 +188,81 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
 
     }
 
-    function testLock() public {
-      mgr.lock(10**18);
+    function lock() public {
+      mgr.lock(1 ether);
       assertEq(rwa.balanceOf(mgr_), 0);
     }
+
+    function join(uint wad) public {
+        drop.mint(wad);
+        drop.approve(mgr_, wad);
+
+        uint mgrBalanceDROP = drop.balanceOf(mgr_);
+        uint selfBalanceDROP = drop.balanceOf(self);
+
+        mgr.join(wad);
+
+        // assert collateral transferred
+        assertEq(drop.balanceOf(mgr_), add(mgrBalanceDROP, wad));
+        assertEq(drop.balanceOf(self), sub(selfBalanceDROP, wad));
+    }
+
+    function exit(uint wad) public {
+        uint mgrBalanceDROP = drop.balanceOf(mgr_);
+        uint selfBalanceDROP = drop.balanceOf(self);
+
+        mgr.exit(wad);
+
+        // assert collateral was transferred correctly from mgr
+        assertEq(drop.balanceOf(mgr_), sub(mgrBalanceDROP, wad));
+        assertEq(drop.balanceOf(self), add(selfBalanceDROP, wad));
+    }
+
+    function draw(uint wad) public {
+        uint selfBalanceDAI = dai.balanceOf(self);
+        uint totalSupplyDAI = dai.totalSupply();
+
+        mgr.draw(wad);
+        // check DAI were minted & transferred correctly
+        assertEq(dai.balanceOf(self), add(selfBalanceDAI, wad));
+        // assertEq(dai.totalSupply(), sub(totalSupplyDAI, wad));
+    }
+
+    function wipe(uint wad) public {
+        uint selfBalanceDAI = dai.balanceOf(self);
+        uint totalSupplyDAI = dai.totalSupply();
+
+        mgr.wipe(wad);
+
+        // check DAI were transferred & burned
+        assertEq(dai.balanceOf(self), sub(selfBalanceDAI, wad));
+        // assertEq(dai.totalSupply(), sub(totalSupplyDAI, wad));
+    }
+
+
+    function testLock() public {
+      lock();
+      assertEq(rwa.balanceOf(mgr_), 0);
+    }
+
+    function testJoin(uint128 wad) public {
+        join(wad);
+    }
+
+    function testExit(uint128 wad) public {
+        testJoin(wad);
+        exit(wad);
+    }
+
+    function testDraw() public {
+        lock();
+        draw(0);
+        draw(ceiling);
+        draw(0);
+    }
+    function testFailDrawAboveCeiling() public {
+        lock();
+        draw(ceiling+1);
+    }
+
 }
