@@ -303,6 +303,26 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         assertEq(seniorOperator.values_uint("redeemOrder_wad"), wad);
     }
 
+    function unwind(uint128 redeemedDAI) public {
+        // setup mocks
+        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, 0);
+        (, uint256 art) = vat.urns(ilk, address(urn));
+        (, uint256 rate, , ,) = vat.ilks(ilk);
+        uint256 cdptab = mul(art, rate);
+        uint selfBalanceDAI = dai.balanceOf(self);
+        uint totalSupplyDAI = dai.totalSupply();
+
+        mgr.unwind(1);
+        uint256 payback = min(redeemedDAI, divup(cdptab, RAY));
+         // make sure redeemed DAI were burned
+        assertEq(dai.totalSupply(), sub(totalSupplyDAI, payback));
+        // make sure remainder was transferred to operator correctly
+        if (redeemedDAI > cdptab) {
+            uint remainder = add(selfBalanceDAI, sub(redeemedDAI, cdptab));
+            assertEq(dai.balanceOf(self), add(selfBalanceDAI, remainder));
+        }
+    }
+
     function testLock() public {
       lock(1 ether);
     }
@@ -409,14 +429,6 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         mgr.tell();
     }
 
-    function testFailTellGlobalSettlement() public {
-        // set live to false
-        cage();
-        // revoke access permissions from self
-        mgr.deny(self);
-        mgr.tell();
-    }
-
     function testSink(uint128 wad) public {
         if (ceiling < wad) return; // amount has to be below ceiling
         // set safe to false, call tell
@@ -438,6 +450,50 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         // set safe to false, call tell
         testDraw(wad);
         sink();
+    }
+
+    function testUnwindFullRepayment(uint128 wad) public {
+        if (ceiling < wad) return; // amount has to be below ceiling
+        testDraw(wad);
+        dai.transferFrom(self, seniorOperator_, wad);
+        // trigger tell condition & set safe to false
+        tell();
+        unwind(wad);
+    }
+
+    function testUnwindPartialRepayment(uint128 wad) public {
+        if (ceiling < wad) return; // amount has to be below ceiling
+        testDraw(wad);
+        dai.transferFrom(self, seniorOperator_, wad);
+        // trigger tell condition & set safe to false
+        tell();
+        unwind(wad / 2); // Payback half of the loan
+    }
+
+
+    function testFailUnwindGlobalSettlement(uint128 wad) public {
+        assert(wad > ceiling); // avoid overflow
+        testDraw(wad);
+        dai.transferFrom(self, seniorOperator_, wad);
+        // trigger tell condition & set safe to false
+        tell();
+        cage();
+        unwind(wad);
+    }
+
+    function testFailUnwindInsufficientDAIBalance(uint128 wad) public {
+       assert(wad > ceiling); // avoid overflow
+        testDraw(wad);
+        // trigger tell condition & set safe to false
+        tell();
+        unwind(wad);
+    }
+
+    function testFailUnwindSafe(uint128 wad) public {
+        assert(wad > ceiling); // avoid overflow
+        testDraw(wad);
+        dai.transferFrom(self, seniorOperator_, wad);
+        unwind(wad);
     }
 
     function testMigrate() public {

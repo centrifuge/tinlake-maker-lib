@@ -274,16 +274,19 @@ contract TinlakeManager is DSTest {
     // DROP tokens are redeemed
     function unwind(uint256 endEpoch) public {
         require(!safe && glad && live, "TinlakeMgr/not-soft-liquidation");
-        (uint256 redeemed, , ,uint256 remainingDrop) = pool.disburse(endEpoch);
+
+        (uint256 redeemed, , ,) = pool.disburse(endEpoch);
+
         // here we use the urn instead of address(this)
         (, uint256 art) = vat.urns(ilk, address(urn));
-
         (, uint256 rate, , ,) = vat.ilks(ilk);
+
         uint256 cdptab = mul(art, rate);
+
         uint256 payBack = min(redeemed, divup(cdptab, RAY));
 
+        dai.transferFrom(address(this), address(urn), payBack);
         urn.wipe(payBack);
-
         // Return possible remainder to the owner
         dai.transfer(owner, dai.balanceOf(address(this)));
         emit Unwind(payBack);
