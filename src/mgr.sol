@@ -18,6 +18,8 @@
 
 pragma solidity >=0.5.12 <0.6.0;
 
+import "ds-test/test.sol";
+
 interface GemLike {
     function decimals() external view returns (uint256);
     function transfer(address,uint256) external returns (bool);
@@ -72,7 +74,7 @@ interface MIP21UrnLike {
 // not only DROP as an ERC20 balance in this contract, but also what's currently
 // undergoing redemption from the Tinlake pool.
 
-contract TinlakeManager {
+contract TinlakeManager is DSTest {
     // --- Auth ---
     mapping (address => uint256) public wards;
     function rely(address usr) external auth {
@@ -221,7 +223,7 @@ contract TinlakeManager {
 
     function wipe(uint256 wad) public {
         require(safe && live, "TinlakeManager/bad-state");
-        dai.transferFrom(msg.sender, address(this), wad);
+        dai.transferFrom(msg.sender, address(urn), wad);
         urn.wipe(wad);
         emit Wipe(wad);
     }
