@@ -18,8 +18,6 @@
 
 pragma solidity >=0.5.12 <0.6.0;
 
-import "ds-test/test.sol";
-
 interface GemLike {
     function decimals() external view returns (uint256);
     function transfer(address,uint256) external returns (bool);
@@ -74,7 +72,7 @@ interface MIP21UrnLike {
 // not only DROP as an ERC20 balance in this contract, but also what's currently
 // undergoing redemption from the Tinlake pool.
 
-contract TinlakeManager is DSTest {
+contract TinlakeManager {
     // --- Auth ---
     mapping (address => uint256) public wards;
     function rely(address usr) external auth {
@@ -145,12 +143,14 @@ contract TinlakeManager is DSTest {
                 address drop_,       address pool_,
                 address governance_, address owner_,
                 address tranche_,    address end_,
-                address vat_,        bytes32 ilk_
+                address vat_,        address vow_,
+                bytes32 ilk_
                 ) public {
 
         dai = GemLike(dai_);
         daiJoin = JoinLike(daiJoin_);
         vat = VatLike(vat_);
+        vow = vow_;
         end = EndLike(end_);
         gem = GemLike(drop_);
         require(gem.decimals() == dec, "TinlakeMgr/decimals-dont-match");
@@ -217,7 +217,7 @@ contract TinlakeManager is DSTest {
     function draw(uint256 wad) public auth {
         require(safe && live, "TinlakeManager/bad-state");
         urn.draw(wad);
-        dai.transferFrom(address(this), msg.sender, wad);
+        dai.transfer(msg.sender, wad);
         emit Draw(wad);
     }
 
@@ -307,11 +307,12 @@ contract TinlakeManager is DSTest {
 
     function recover(uint256 endEpoch) public {
         require(!glad, "TinlakeMgr/not-written-off");
-
+ 
         (uint256 recovered, , ,) = pool.disburse(endEpoch);
         uint256 payBack;
         if (end.debt() == 0) {
             payBack = min(recovered, tab / RAY);
+            dai.approve(address(daiJoin), payBack);
             daiJoin.join(address(vow), payBack);
             tab = sub(tab, mul(payBack, RAY));
         }
