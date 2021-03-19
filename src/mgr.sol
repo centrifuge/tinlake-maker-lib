@@ -16,9 +16,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity >=0.5.12 <0.6.0;
-
-import "ds-test/test.sol";
+pragma solidity =0.5.12;
 
 interface GemLike {
     function decimals() external view returns (uint256);
@@ -49,6 +47,11 @@ interface VatLike {
     function live() external returns(uint);
 }
 
+interface GemJoinLike {
+    function gem() external returns (address);
+    function ilk() external returns (bytes32);
+}
+
 interface MIP21UrnLike {
     function lock(uint256 wad) external;
     function free(uint256 wad) external;
@@ -57,29 +60,16 @@ interface MIP21UrnLike {
     // n.b. anyone can wipe
     function wipe(uint256 wad) external;
     function quit() external;
+    function gemJoin() external returns (address);
 }
 
-// This contract is essentially a merge of
-// a join and a cdp-manager.
-
-// It manages only one urn, which can be liquidated in two stages:
-// 1) In the first stage, set safe = false and call
-// pool.disburse() to try to recover as much dai as possible.
-
-// 2) After the first liquidation period has completed, we either managed to redeem
-// enough dai to wipe off all cdp debt, or this debt needs to be written off
-// and addded to the sin.
-
-// Note that the internal gem created as a result of `join` through this manager is
-// not only DROP as an ERC20 balance in this contract, but also what's currently
-// undergoing redemption from the Tinlake pool.
+interface MIP21LiquidationLike {
+  function ilks(bytes32 ilk) external returns (string memory, address, uint48, uint48);
+}
 
 contract TinlakeManager {
     // --- Auth ---
-    // Wards are for Centrifuge
     mapping (address => uint256) public wards;
-    // can is Maker governance
-    mapping (address => uint256) public can;
 
     function rely(address usr) external auth {
         wards[usr] = 1;
@@ -94,45 +84,26 @@ contract TinlakeManager {
         _;
     }
 
-    function hope(address usr) external auth {
-        can[usr] = 1;
-        emit Hope(usr);
-    }
-    function nope(address usr) external auth {
-        can[usr] = 0;
-        emit Nope(usr);
-    }
-    // Maker Governance is authorized call tell, sink and migrate.
-    modifier governance {
-        require(can[msg.sender] == 1, "TinlakeMgr/not-governance");
-        _;
-    }
-
-
     // Events
     event Rely(address indexed usr);
     event Deny(address indexed usr);
-    event Hope(address indexed who);
-    event Nope(address indexed who);
     event Draw(uint256 wad);
     event Wipe(uint256 wad);
     event Join(uint256 wad);
     event Exit(uint256 wad);
     event Tell(uint256 wad);
     event Unwind(uint256 payBack);
-    event Sink(uint256 tab);
+    event Cull(uint256 tab);
     event Recover(uint256 recovered, uint256 payBack);
     event Cage();
     event File(bytes32 indexed what, address indexed data);
-    event File(bytes32 indexed what, bytes32 indexed data);
     event Migrate(address indexed dst);
 
     bool public safe; // Soft liquidation not triggered
     bool public glad; // Write-off not triggered
     bool public live; // Global settlement not triggered
 
-    uint256 public tab;  // Dai written off
-    bytes32 public ilk; // name of the collateral type
+    uint256 public tab;  // Dai owed
 
     // --- Contracts ---
     // dss components
@@ -144,22 +115,19 @@ contract TinlakeManager {
 
     // Tinlake components
     GemLike      public gem;
-    GemLike      public rwaToken;
     RedeemLike   public pool;
 
     // MIP21 RWAUrn
     MIP21UrnLike public urn;
-
-    uint256 public constant dec = 18;
+    MIP21LiquidationLike public liq;
 
     address public tranche;
     address public owner;
 
-    constructor(address dai_,       address daiJoin_,
-                address drop_,      address pool_,
-                address governance, address owner_,
-                address tranche_,   address end_,
-                address vat_,       bytes32 ilk_
+    constructor(address dai_,   address daiJoin_,
+                address drop_,  address pool_,
+                address owner_, address tranche_,
+                address end_,   address vat_
                 ) public {
 
         dai = GemLike(dai_);
@@ -167,18 +135,11 @@ contract TinlakeManager {
         vat = VatLike(vat_);
         end = EndLike(end_);
         gem = GemLike(drop_);
-        require(gem.decimals() == dec, "TinlakeMgr/decimals-dont-match");
 
         pool = RedeemLike(pool_);
 
-        ilk = ilk_;
         wards[msg.sender] = 1;
         emit Rely(msg.sender);
-
-
-        can[governance] = 1;
-        emit Hope(governance);
-        owner = owner_;
 
         safe = true;
         glad = true;
@@ -206,14 +167,20 @@ contract TinlakeManager {
     }
 
 
+    // --- Gem Operation ---
     // moves the rwaToken into the vault
     // requires that mgr contract holds the rwaToken
     function lock(uint256 wad) public auth {
-        rwaToken.approve(address(urn), uint256(wad));
+        GemLike(GemJoinLike(urn.gemJoin()).gem()).approve(address(urn), uint256(wad));
         urn.lock(wad);
     }
+    // moves the rwaToken into the vault
+    // requires that mgr contract holds the rwaToken
+    function free(uint256 wad) public auth {
+        urn.free(wad);
+    }
 
-    // --- Vault Operation---
+    // --- DROP Operation ---
     // join & exit move the gem directly into/from the urn
     function join(uint256 wad) public auth {
         require(safe && live, "TinlakeManager/bad-state");
@@ -229,6 +196,7 @@ contract TinlakeManager {
         emit Exit(wad);
     }
 
+    // --- DAI Operation ---
     // draw & wipe call daiJoin.exit/join immediately
     function draw(uint256 wad) public auth {
         require(safe && live, "TinlakeManager/bad-state");
@@ -244,25 +212,18 @@ contract TinlakeManager {
         emit Wipe(wad);
     }
 
-    function free(uint256 wad) public auth {
+    // Take DAI from the urn in case there is any in the Urn
+    // can be dealt with through migrate() after ES
+    function quit(uint256 wad) public auth {
         urn.quit();
     }
 
     // --- Administration ---
-    function migrate(address dst) public {
-        require(can[msg.sender] == 1 || wards[msg.sender] == 1, "TinlakeMgr/auth-or-gov-only");
-
+    function migrate(address dst) public auth {
         dai.approve(dst, uint256(-1));
         gem.approve(dst, uint256(-1));
         live = false;
         emit Migrate(dst);
-    }
-
-    function file(bytes32 what, bytes32 data) public auth {
-        emit File(what, data);
-        if (what == "ilk") {
-          ilk = what;
-        } else revert("TinlakeMgr/file-unknown-param");
     }
 
     function file(bytes32 what, address data) public auth {
@@ -271,11 +232,11 @@ contract TinlakeManager {
             urn = MIP21UrnLike(data);
             dai.approve(data, uint256(-1));
         }
+        else if (what == "liq") {
+            liq = MIP21LiquidationLike(data);
+        }
         else if (what == "owner") {
             owner = data;
-        }
-        else if (what == "rwaToken") {
-            rwaToken = GemLike(data);
         }
         else revert("TinlakeMgr/file-unknown-param");
     }
@@ -283,8 +244,17 @@ contract TinlakeManager {
     // --- Liquidation ---
     // triggers a soft liquidation of the DROP collateral
     // a redeemOrder is submitted to receive DAI back
-    function tell() public governance {
+    function tell() public {
         require(safe, "TinlakeMgr/not-safe");
+        bytes32 ilk = GemJoinLike(urn.gemJoin()).ilk();
+
+        (,,, uint48 toc) = liq.ilks(ilk);
+        require(toc != 0, "TinlakeMgr/not-liquidated");
+
+        (, uint256 art) = vat.urns(ilk, address(urn));
+        (, uint256 rate, , ,) = vat.ilks(ilk);
+        tab = mul(art, rate);
+
         uint256 ink = gem.balanceOf(address(this));
         safe = false;
         gem.approve(tranche, ink);
@@ -299,33 +269,33 @@ contract TinlakeManager {
         require(!safe && glad && live, "TinlakeMgr/not-soft-liquidation");
 
         (uint256 redeemed, , ,) = pool.disburse(endEpoch);
+        bytes32 ilk = GemJoinLike(urn.gemJoin()).ilk();
 
-        // here we use the urn instead of address(this)
         (, uint256 art) = vat.urns(ilk, address(urn));
         (, uint256 rate, , ,) = vat.ilks(ilk);
+        tab = mul(art, rate);
 
-        uint256 cdptab = mul(art, rate);
-
-        uint256 payBack = min(redeemed, divup(cdptab, RAY));
-
+        uint256 payBack = min(redeemed, divup(tab, RAY));
         dai.transferFrom(address(this), address(urn), payBack);
         urn.wipe(payBack);
+
         // Return possible remainder to the owner
         dai.transfer(owner, dai.balanceOf(address(this)));
         emit Unwind(payBack);
     }
 
     // --- Write-off ---
-    // method should be called before RwaLiquidationOracle.cull()
-    function sink() public governance {
+    // can be called after RwaLiquidationOracle.cull()
+    function cull() public {
         require(!safe && glad && live, "TinlakeMgr/bad-state");
-        (, uint256 art) = vat.urns(ilk, address(urn));
-        require(art <= 2 ** 255, "TinlakeMgr/overflow");
-        (, uint256 rate, , ,) = vat.ilks(ilk);
+        bytes32 ilk = GemJoinLike(urn.gemJoin()).ilk();
 
-        tab = mul(rate, art);
+        (,, uint48 tau, uint48 toc) = liq.ilks(ilk);
+        require(toc != 0, "TinlakeMgr/not-liquidated");
+        require(block.timestamp >= add(toc, tau), "TinlakeMgr/early-cull");
+
         glad = false;
-        emit Sink(tab);
+        emit Cull(tab);
     }
 
     function recover(uint256 endEpoch) public {

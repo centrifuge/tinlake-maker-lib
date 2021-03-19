@@ -1,4 +1,4 @@
-pragma solidity >=0.5.12;
+pragma solidity =0.5.12;
 
 
 import "../mgr.sol";
@@ -169,12 +169,10 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
                                  daiJoin_,
                                  drop_, // DROP token
                                  seniorOperator_, // senior operator
-                                 address(this),
                                  address(this), // senior tranche
                                  seniorTranche_,
                                  end_,
-                                 address(vat),
-                                 ilk);
+                                 address(vat));
         mgr_ = address(mgr);
 
         urn = new RwaUrn(address(vat), address(jug), address(gemJoin), address(daiJoin), mgr_);
@@ -188,7 +186,7 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         // auth user to operate
         urn.hope(mgr_);
         mgr.file("urn", address(urn));
-        mgr.file("rwaToken", address(rwa));
+        mgr.file("liq", address(oracle));
     }
 
     function cage() public {
@@ -253,31 +251,19 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
 
     function migrate() public {
          // deploy new mgr
-        TinlakeManager newMgr = new TinlakeManager(dai_,
-                                    daiJoin_,
-                                    drop_, // DROP token
-                                    seniorOperator_, // senior operator
-                                    address(this),
-                                    address(this), // senior tranche
-                                    seniorTranche_,
-                                    end_,
-                                    address(vat),
-                                    ilk);
-        address newMgr_ = address(newMgr);
-
-        mgr.migrate(newMgr_);
+        address newMgr = address(1);
+        mgr.migrate(newMgr);
 
 
         // check allowance set for dai & collateral
-        assertEq(dai.allowance(mgr_, newMgr_), uint256(-1));
-        assertEq(drop.allowance(mgr_, newMgr_), uint256(-1));
+        assertEq(dai.allowance(mgr_, newMgr), uint256(-1));
+        assertEq(drop.allowance(mgr_, newMgr), uint256(-1));
         // assert live is set to false
         assert(!mgr.live());
     }
 
-    function sink() public {
-
-        mgr.sink();
+    function cull() public {
+        mgr.cull();
 
         (, uint256 art) = vat.urns(ilk, address(urn));
         (, uint256 rate, , ,) = vat.ilks(ilk);
@@ -285,7 +271,7 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         uint tab = mul(rate, art);
 
         assertEq(mgr.tab(), tab);
-        // assert sink called
+        // assert cull called
         assert(!mgr.glad());
     }
 
@@ -294,6 +280,8 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         uint128 wad = 100 ether;
         testJoin(wad);
 
+        vat.file(ilk, "line", rad(0));
+        oracle.tell(ilk);
         mgr.tell();
 
         // safe flipped to false
@@ -429,27 +417,28 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         mgr.tell();
     }
 
-    function testSink(uint128 wad) public {
+    function testCull(uint128 wad) public {
         if (ceiling < wad) return; // amount has to be below ceiling
         // set safe to false, call tell
         testDraw(wad);
         tell();
-        sink();
+        hevm.warp(block.timestamp + 2 weeks);
+        cull();
     }
 
-    function testFailSinkGlobalSettlement() public {
+    function testFailCullGlobalSettlement() public {
         uint wad = 100 ether;
         testDraw(wad);
         tell();
         cage();
-        sink();
+        cull();
     }
 
-    function testFailSinkIsSafe(uint wad) public {
+    function testFailCullIsSafe(uint wad) public {
         uint wad = 100 ether;
         // set safe to false, call tell
         testDraw(wad);
-        sink();
+        cull();
     }
 
     function testUnwindFullRepayment(uint128 wad) public {
