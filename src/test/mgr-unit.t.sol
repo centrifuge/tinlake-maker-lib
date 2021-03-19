@@ -5,7 +5,7 @@ import "../mgr.sol";
 
 import { Mock } from "./mocks/mock.sol";
 import { TrancheMock } from "./mocks/tranche.sol";
-import { OperatorMock } from "./mocks/tinlake/operator.sol";
+import { OperatorMock } from "./mocks/operator.sol";
 import { VowMock } from "./mocks/vow.sol";
 import { EndMock } from "./mocks/end.sol";
 import { DaiJoinMock } from "./mocks/daijoin.sol";
@@ -60,42 +60,43 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
 
     // Maker
     DaiJoin daiJoin;
-    address daiJoin_;
     EndMock end;
     DSToken dai;
-    address dai_;
     Vat vat;
+    DSToken gov;
+    RwaToken rwa;
+    AuthGemJoin gemJoin;
+    RwaUrn urn;
+    RwaLiquidationOracle oracle;
+    Jug jug;
+    Spotter spotter;
+
+    address daiJoin_;
+    address gemJoin_;
+    address dai_;
     address vow = address(123);
     address end_;
+    address urn_;
     bytes32 constant ilk = "DROP"; // New Collateral Type
 
     // Tinlake
     DSToken drop;
     TrancheMock seniorTranche;
     OperatorMock seniorOperator;
+    TinlakeManager mgr;
+
     address drop_;
     address seniorTranche_;
     address seniorOperator_;
-
-    TinlakeManager mgr;
     address mgr_;
     address self;
+
 
     // -- testing --
     Hevm constant hevm = Hevm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
     uint256 rate;
     uint256 ceiling = 400 ether;
     string doc = "Please sign on the dotted line.";
-
-    DSToken gov;
-    RwaToken rwa;
-    AuthGemJoin gemJoin;
-    RwaUrn urn;
-    RwaLiquidationOracle oracle;
-
-    Jug jug;
-    Spotter spotter;
-
 
     function setUp() public {
         hevm.warp(604411200);
@@ -151,7 +152,8 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         spotter.poke(ilk);
 
         gemJoin = new AuthGemJoin(address(vat), ilk, address(rwa));
-        vat.rely(address(gemJoin));
+        gemJoin_ = address(gemJoin);
+        vat.rely(gemJoin_);
 
 
         // Tinlake Stuff
@@ -176,27 +178,36 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         mgr_ = address(mgr);
 
         urn = new RwaUrn(address(vat), address(jug), address(gemJoin), address(daiJoin), mgr_);
+        urn_ = address(urn);
         gemJoin.rely(address(urn));
 
         // fund mgr with rwa
         rwa.transfer(mgr_, 1 ether);
+        assertEq(rwa.balanceOf(mgr_), 1 ether);
 
         // auth user to operate
         urn.hope(mgr_);
         mgr.file("urn", address(urn));
         mgr.file("rwaToken", address(rwa));
-
     }
 
-    function lock() public {
-      mgr.lock(1 ether);
-      assertEq(rwa.balanceOf(mgr_), 0);
+    function cage() public {
+        mgr.cage();
+        assert(!mgr.live());
+        assert(!mgr.glad());
+    }
+
+    function lock(uint wad) public {
+      uint initialMgrBalance = rwa.balanceOf(mgr_);
+      uint initialJoinBalance = rwa.balanceOf(gemJoin_);
+
+      mgr.lock(wad);
+
+      assertEq(rwa.balanceOf(mgr_), sub(initialMgrBalance, wad));
+      assertEq(rwa.balanceOf(gemJoin_), add(initialJoinBalance, wad));
     }
 
     function join(uint wad) public {
-        drop.mint(wad);
-        drop.approve(mgr_, wad);
-
         uint mgrBalanceDROP = drop.balanceOf(mgr_);
         uint selfBalanceDROP = drop.balanceOf(self);
 
@@ -223,30 +234,141 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         uint totalSupplyDAI = dai.totalSupply();
 
         mgr.draw(wad);
+
         // check DAI were minted & transferred correctly
         assertEq(dai.balanceOf(self), add(selfBalanceDAI, wad));
-        // assertEq(dai.totalSupply(), sub(totalSupplyDAI, wad));
+        assertEq(dai.totalSupply(), add(totalSupplyDAI, wad));
     }
 
     function wipe(uint wad) public {
         uint selfBalanceDAI = dai.balanceOf(self);
         uint totalSupplyDAI = dai.totalSupply();
-
+       
         mgr.wipe(wad);
 
         // check DAI were transferred & burned
         assertEq(dai.balanceOf(self), sub(selfBalanceDAI, wad));
-        // assertEq(dai.totalSupply(), sub(totalSupplyDAI, wad));
+       // assertEq(dai.totalSupply(), sub(totalSupplyDAI, wad));
     }
 
+    function migrate() public {
+         // deploy new mgr
+        TinlakeManager newMgr = new TinlakeManager(dai_,
+                                    daiJoin_,
+                                    drop_, // DROP token
+                                    seniorOperator_, // senior operator
+                                    address(this),
+                                    address(this), // senior tranche
+                                    seniorTranche_,
+                                    end_,
+                                    address(vat),
+                                    ilk);
+        address newMgr_ = address(newMgr);
+
+        mgr.migrate(newMgr_);
+
+
+        // check allowance set for dai & collateral
+        assertEq(dai.allowance(mgr_, newMgr_), uint(-1));
+        assertEq(drop.allowance(mgr_, newMgr_), uint(-1));
+        // assert live is set to false
+        assert(!mgr.live());
+    }
+
+    function sink() public {
+
+        mgr.sink();
+
+        (, uint256 art) = vat.urns(ilk, address(urn));
+        (, uint256 rate, , ,) = vat.ilks(ilk);
+        // assert correct DAI amount was written off
+        uint tab = mul(rate, art);
+        
+        assertEq(mgr.tab(), tab);
+        // assert sink called
+        assert(!mgr.glad());
+    }
+
+    function tell() public {
+        // put collateral into cdp
+        uint128 wad = 100 ether;
+        testJoin(wad);
+
+        mgr.tell();
+
+        // safe flipped to false
+        assert(!mgr.safe());
+
+        assertEq(seniorOperator.calls("redeemOrder"), 1);
+        assertEq(seniorOperator.values_uint("redeemOrder_wad"), wad);
+    }
+
+    function unwind(uint128 redeemedDAI) public {
+        // setup mocks
+        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, 0);
+        (, uint256 art) = vat.urns(ilk, address(urn));
+        (, uint256 rate, , ,) = vat.ilks(ilk);
+        uint256 cdptab = mul(art, rate);
+        uint selfBalanceDAI = dai.balanceOf(self);
+        uint totalSupplyDAI = dai.totalSupply();
+
+        mgr.unwind(1);
+        uint256 payback = min(redeemedDAI, divup(cdptab, RAY));
+         // make sure redeemed DAI were burned
+        assertEq(dai.totalSupply(), sub(totalSupplyDAI, payback));
+        // make sure remainder was transferred to operator correctly
+        if (redeemedDAI > cdptab) {
+            uint remainder = add(selfBalanceDAI, sub(redeemedDAI, cdptab));
+            assertEq(dai.balanceOf(self), add(selfBalanceDAI, remainder));
+        }
+    }
 
     function testLock() public {
-      lock();
-      assertEq(rwa.balanceOf(mgr_), 0);
+      lock(1 ether);
+    }
+
+    function testFailLockGlobalSettlement() public {
+        cage();
+        testLock();
     }
 
     function testJoin(uint128 wad) public {
+        drop.mint(wad);
+        drop.approve(mgr_, wad);
         join(wad);
+    }
+
+    function testFailJoinGlobalSettlement(uint128 art, uint128 ink, uint128 wad) public {
+        cage();
+        testJoin(wad);
+    }
+
+    function testFailJoinCollateralAmountTooHigh(uint128 wad) public {
+        // wad = 100 ether;
+        // mint collateral for test contract
+        uint collateralBalance = sub(wad, 1);
+        drop.mint(self, collateralBalance);
+        // approve mgr to take collateral
+        drop.approve(mgr_, collateralBalance);
+        join(wad);
+    }
+
+    function testDraw(uint wad) public {
+        if (ceiling < wad) return; // amount has to be below ceiling
+        testLock();
+        draw(wad);
+    }
+
+    function testFailDrawAboveCeiling(uint wad) public {
+        assert(ceiling < wad); 
+        testLock();
+        draw(wad);
+    }
+
+    function testFailDrawGlobalSettlement() public {
+        testLock();
+        cage();
+        draw(add(ceiling, 1));
     }
 
     function testExit(uint128 wad) public {
@@ -254,15 +376,127 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         exit(wad);
     }
 
-    function testDraw() public {
-        lock();
-        draw(0);
-        draw(ceiling);
-        draw(0);
-    }
-    function testFailDrawAboveCeiling() public {
-        lock();
-        draw(ceiling+1);
+    function testPartialExit(uint128 wad) public {
+        testJoin(wad);
+        exit(div(wad, 2));
     }
 
+    function testFailExitCollateralAmountTooHigh(uint128 wad) public {
+        // join collateral
+        testJoin(wad);
+        // try to exit more then available
+        exit(add(wad, 1));
+    }
+
+    function testFailExitGlobalSettlement(uint128 wad) public {
+        // set live to false
+        cage();
+        testExit(wad);
+    }
+
+    function testWipe(uint128 wad) public {
+        if (ceiling < wad) return; // amount has to be below ceiling
+        testDraw(wad);
+        dai.approve(mgr_, wad);
+        wipe(wad);
+    }
+
+    function testFailWipeGlobalSettlement(uint128 wad) public {
+        // set live to false
+        cage();
+        testWipe(wad);
+    }
+
+    function testFailWipeInsufficientDAIBalance(uint128 wad) public {
+       assert(wad > 0);
+       testDraw(wad - 1);
+       dai.approve(mgr_, wad);
+       wipe(wad);
+    }
+
+    function testFailWipeNoDAIApproval(uint128 wad) public {
+        assert(wad > 0);
+        testDraw(wad);
+        wipe(wad);
+    }
+
+    function testTell() public {
+        tell();
+    }
+
+    function testFailTellNotSafe() public {
+        tell();
+        mgr.tell();
+    }
+
+    function testSink(uint128 wad) public {
+        if (ceiling < wad) return; // amount has to be below ceiling
+        // set safe to false, call tell
+        testDraw(wad);
+        tell();
+        sink();
+    }
+    
+    function testFailSinkGlobalSettlement() public {
+        uint wad = 100 ether;
+        testDraw(wad);
+        tell();
+        cage();
+        sink();
+    }
+
+    function testFailSinkIsSafe(uint wad) public {
+        uint wad = 100 ether;
+        // set safe to false, call tell
+        testDraw(wad);
+        sink();
+    }
+
+    function testUnwindFullRepayment(uint128 wad) public {
+        if (ceiling < wad) return; // amount has to be below ceiling
+        testDraw(wad);
+        dai.transferFrom(self, seniorOperator_, wad);
+        // trigger tell condition & set safe to false
+        tell();
+        unwind(wad);
+    }
+
+    function testUnwindPartialRepayment(uint128 wad) public {
+        if (ceiling < wad) return; // amount has to be below ceiling
+        testDraw(wad);
+        dai.transferFrom(self, seniorOperator_, wad);
+        // trigger tell condition & set safe to false
+        tell();
+        unwind(wad / 2); // Payback half of the loan
+    }
+
+
+    function testFailUnwindGlobalSettlement(uint128 wad) public {
+        assert(wad > ceiling); // avoid overflow
+        testDraw(wad);
+        dai.transferFrom(self, seniorOperator_, wad);
+        // trigger tell condition & set safe to false
+        tell();
+        cage();
+        unwind(wad);
+    }
+
+    function testFailUnwindInsufficientDAIBalance(uint128 wad) public {
+       assert(wad > ceiling); // avoid overflow
+        testDraw(wad);
+        // trigger tell condition & set safe to false
+        tell();
+        unwind(wad);
+    }
+
+    function testFailUnwindSafe(uint128 wad) public {
+        assert(wad > ceiling); // avoid overflow
+        testDraw(wad);
+        dai.transferFrom(self, seniorOperator_, wad);
+        unwind(wad);
+    }
+
+    function testMigrate() public {
+          migrate();
+    }
 }

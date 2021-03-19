@@ -16,8 +16,8 @@
 pragma solidity >=0.5.12 <0.6.0;
 import "ds-test/test.sol";
 
-import "../mock.sol";
-import "../auth.sol";
+import "./mock.sol";
+import "./auth.sol";
 import { Dai } from "dss/dai.sol";
 
 
