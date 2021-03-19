@@ -124,6 +124,7 @@ contract TinlakeManager {
     event Recover(uint256 recovered, uint256 payBack);
     event Cage();
     event File(bytes32 indexed what, address indexed data);
+    event File(bytes32 indexed what, bytes32 indexed data);
     event Migrate(address indexed dst);
 
     bool public safe; // Soft liquidation not triggered
@@ -208,7 +209,6 @@ contract TinlakeManager {
     // moves the rwaToken into the vault
     // requires that mgr contract holds the rwaToken
     function lock(uint256 wad) public auth {
-        require(vat.live() == 1, "TinlakeManager/mkr-in-ES");
         rwaToken.approve(address(urn), uint256(wad));
         urn.lock(wad);
     }
@@ -256,6 +256,13 @@ contract TinlakeManager {
         gem.approve(dst, uint256(-1));
         live = false;
         emit Migrate(dst);
+    }
+
+    function file(bytes32 what, bytes32 data) public auth {
+        emit File(what, data);
+        if (what == "ilk") {
+          ilk = what;
+        } else revert("TinlakeMgr/file-unknown-param");
     }
 
     function file(bytes32 what, address data) public auth {
