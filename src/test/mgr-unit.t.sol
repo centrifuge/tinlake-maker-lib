@@ -470,7 +470,6 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         unwind(wad / 2); // Payback half of the loan
     }
 
-
     function testFailUnwindGlobalSettlement(uint128 wad) public {
         assert(wad > ceiling); // avoid overflow
         testDraw(wad);
@@ -499,4 +498,11 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
     function testMigrate() public {
           migrate();
     }
+
+    // function testRecover(uint wad) public {
+    //      if (ceiling < wad) return; // amount has to be below ceiling
+    //     testSink(wad);
+    //     recover(wad, 1);
+    // }
+
 }
