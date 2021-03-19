@@ -74,7 +74,11 @@ interface MIP21UrnLike {
 
 contract TinlakeManager {
     // --- Auth ---
+    // Wards are for Centrifuge
     mapping (address => uint256) public wards;
+    // can is Maker governance
+    mapping (address => uint256) public can;
+
     function rely(address usr) external auth {
         wards[usr] = 1;
         emit Rely(usr);
@@ -88,17 +92,26 @@ contract TinlakeManager {
         _;
     }
 
-    // Maker Governance is authorized call tell, unwind, and migrate.
-    address public governance;
-
-    modifier governanceOnly {
-        require(msg.sender == governance, "TinlakeMgr/governance-only");
+    function hope(address usr) external auth {
+        can[usr] = 1;
+        emit Hope(usr);
+    }
+    function nope(address usr) external auth {
+        can[usr] = 0;
+        emit Nope(usr);
+    }
+    // Maker Governance is authorized call tell, sink and migrate.
+    modifier governance {
+        require(can[msg.sender] == 1, "TinlakeMgr/not-governance");
         _;
     }
+
 
     // Events
     event Rely(address indexed usr);
     event Deny(address indexed usr);
+    event Hope(address indexed who);
+    event Nope(address indexed who);
     event Draw(uint256 wad);
     event Wipe(uint256 wad);
     event Join(uint256 wad);
@@ -109,6 +122,7 @@ contract TinlakeManager {
     event Recover(uint256 recovered, uint256 payBack);
     event Cage();
     event File(bytes32 indexed what, address indexed data);
+    event File(bytes32 indexed what, bytes32 indexed data);
     event Migrate(address indexed dst);
 
     bool public safe; // Soft liquidation not triggered
@@ -160,7 +174,10 @@ contract TinlakeManager {
         ilk = ilk_;
         wards[msg.sender] = 1;
         emit Rely(msg.sender);
-        governance = governance_;
+
+
+        can[governance] = 1;
+        emit Hope(governance);
         owner = owner_;
 
         safe = true;
@@ -192,7 +209,6 @@ contract TinlakeManager {
     // moves the rwaToken into the vault
     // requires that mgr contract holds the rwaToken
     function lock(uint256 wad) public auth {
-        require(vat.live() == 1, "TinlakeManager/mkr-in-ES");
         rwaToken.approve(address(urn), uint256(wad));
         urn.lock(wad);
     }
@@ -234,12 +250,19 @@ contract TinlakeManager {
 
     // --- Administration ---
     function migrate(address dst) public {
-        require(msg.sender == governance || wards[msg.sender] == 1, "TinlakeMgr/auth-or-gov-only");
+        require(can[msg.sender] == 1 || wards[msg.sender] == 1, "TinlakeMgr/auth-or-gov-only");
 
         dai.approve(dst, uint256(-1));
         gem.approve(dst, uint256(-1));
         live = false;
         emit Migrate(dst);
+    }
+
+    function file(bytes32 what, bytes32 data) public auth {
+        emit File(what, data);
+        if (what == "ilk") {
+          ilk = what;
+        } else revert("TinlakeMgr/file-unknown-param");
     }
 
     function file(bytes32 what, address data) public auth {
@@ -260,7 +283,7 @@ contract TinlakeManager {
     // --- Liquidation ---
     // triggers a soft liquidation of the DROP collateral
     // a redeemOrder is submitted to receive DAI back
-    function tell() public governanceOnly {
+    function tell() public governance {
         require(safe, "TinlakeMgr/not-safe");
         uint256 ink = gem.balanceOf(address(this));
         safe = false;
@@ -294,7 +317,7 @@ contract TinlakeManager {
 
     // --- Write-off ---
     // method should be called before RwaLiquidationOracle.cull()
-    function sink() public governanceOnly {
+    function sink() public governance {
         require(!safe && glad && live, "TinlakeMgr/bad-state");
         (, uint256 art) = vat.urns(ilk, address(urn));
         require(art <= 2 ** 255, "TinlakeMgr/overflow");

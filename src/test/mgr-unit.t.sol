@@ -245,7 +245,7 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
     function wipe(uint wad) public {
         uint selfBalanceDAI = dai.balanceOf(self);
         uint totalSupplyDAI = dai.totalSupply();
-       
+
         mgr.wipe(wad);
 
         // check DAI were transferred & burned
@@ -272,8 +272,8 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
 
 
         // check allowance set for dai & collateral
-        assertEq(dai.allowance(mgr_, newMgr_), uint(-1));
-        assertEq(drop.allowance(mgr_, newMgr_), uint(-1));
+        assertEq(dai.allowance(mgr_, newMgr_), uint256(-1));
+        assertEq(drop.allowance(mgr_, newMgr_), uint256(-1));
         // assert live is set to false
         assert(!mgr.live());
     }
@@ -286,7 +286,7 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         (, uint256 rate, , ,) = vat.ilks(ilk);
         // assert correct DAI amount was written off
         uint tab = mul(rate, art);
-        
+
         assertEq(mgr.tab(), tab);
         // assert sink called
         assert(!mgr.glad());
@@ -391,7 +391,7 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
     }
 
     function testFailDrawAboveCeiling(uint wad) public {
-        assert(ceiling < wad); 
+        assert(ceiling < wad);
         testLock();
         draw(wad);
     }
@@ -467,7 +467,7 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         tell();
         sink();
     }
-    
+
     function testFailSinkGlobalSettlement() public {
         uint wad = 100 ether;
         testDraw(wad);
