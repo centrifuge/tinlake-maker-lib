@@ -74,7 +74,7 @@ interface MIP21UrnLike {
 // not only DROP as an ERC20 balance in this contract, but also what's currently
 // undergoing redemption from the Tinlake pool.
 
-contract TinlakeManager is DSTest {
+contract TinlakeManager {
     // --- Auth ---
     mapping (address => uint256) public wards;
     function rely(address usr) external auth {
