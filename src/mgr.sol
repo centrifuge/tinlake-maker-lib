@@ -238,6 +238,12 @@ contract TinlakeManager {
         else if (what == "owner") {
             owner = data;
         }
+        else if (what == "pool") {
+            pool = RedeemLike(data);
+        }
+        else if (what == "tranche") {
+            tranche = data;
+        }
         else revert("TinlakeMgr/file-unknown-param");
     }
 
