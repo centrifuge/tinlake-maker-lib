@@ -263,12 +263,13 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
     }
 
     function cull() public {
-        mgr.cull();
-
         (, uint256 art) = vat.urns(ilk, address(urn));
         (, uint256 rate, , ,) = vat.ilks(ilk);
         // assert correct DAI amount was written off
         uint tab = mul(rate, art);
+
+        oracle.cull(ilk, address(urn));
+        mgr.cull();
 
         assertEq(mgr.tab(), tab);
         // assert cull called
@@ -417,6 +418,25 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         mgr.tell();
     }
 
+    function testFailCullMissingUrnOracleCull() public {
+        uint wad = 0.5 ether;
+        testDraw(wad);
+
+        (uint256 ink, uint256 art) = vat.urns(ilk, address(urn));
+
+        tell();
+        assertEq(mgr.tab(), RAY * wad);
+
+        hevm.warp(block.timestamp + 2 weeks);
+
+        // should fail because oracle.cull() is missing
+        mgr.cull();
+    }
+
+    function testCullDefault() public {
+        testCull(0.5 ether);
+    }
+
     function testCull(uint128 wad) public {
         if (ceiling < wad) return; // amount has to be below ceiling
         // set safe to false, call tell
@@ -456,7 +476,10 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         dai.transferFrom(self, seniorOperator_, wad);
         // trigger tell condition & set safe to false
         tell();
+        uint tab = mgr.tab();
+
         unwind(wad / 2); // Payback half of the loan
+        assertEq(tab/2, mgr.tab());
     }
 
     function testFailUnwindGlobalSettlement(uint128 wad) public {
