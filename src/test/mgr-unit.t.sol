@@ -478,8 +478,9 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         tell();
         uint tab = mgr.tab();
 
-        unwind(wad / 2); // Payback half of the loan
-        assertEq(tab/2, mgr.tab());
+        uint128 repayAmount = wad/2;
+        unwind(repayAmount); // Payback half of the loan
+        assertEq(tab-repayAmount*RAY, mgr.tab());
     }
 
     function testFailUnwindGlobalSettlement(uint128 wad) public {
