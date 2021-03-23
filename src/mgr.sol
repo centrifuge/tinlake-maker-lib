@@ -308,7 +308,7 @@ contract TinlakeManager {
         if (end.debt() == 0) {
             payBack = min(recovered, tab / RAY);
             dai.approve(address(daiJoin), payBack);
-            daiJoin.join(address(vow), payBack);
+            daiJoin.join(vow, payBack);
             tab = sub(tab, mul(payBack, RAY));
         }
         dai.transfer(owner, dai.balanceOf(address(this)));
