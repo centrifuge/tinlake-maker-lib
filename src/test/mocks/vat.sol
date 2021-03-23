@@ -32,7 +32,7 @@ contract VatMock is Mock, Auth {
 
     function urns(bytes32, address) external returns (uint, uint) {
         calls["urns"]++;
-        return (values_uint["ink"], values_uint["art"]);
+        return (values_return["urns_ink"], values_return["urns_art"]);
     }
 
     function hope(address usr) external {
