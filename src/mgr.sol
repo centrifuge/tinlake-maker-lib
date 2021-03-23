@@ -125,14 +125,15 @@ contract TinlakeManager {
     address public owner;
 
     constructor(address dai_,   address daiJoin_,
-        address drop_,  address pool_,
-        address owner_, address tranche_,
-        address end_,   address vat_
-    ) public {
-
+                address drop_,  address pool_,
+                address owner_, address tranche_,
+                address end_,   address vat_,
+                address vow_
+                ) public {
         dai = GemLike(dai_);
         daiJoin = JoinLike(daiJoin_);
         vat = VatLike(vat_);
+        vow = vow_;
         end = EndLike(end_);
         gem = GemLike(drop_);
 
@@ -201,7 +202,7 @@ contract TinlakeManager {
     function draw(uint256 wad) public auth {
         require(safe && live, "TinlakeManager/bad-state");
         urn.draw(wad);
-        dai.transferFrom(address(this), msg.sender, wad);
+        dai.transfer(msg.sender, wad);
         emit Draw(wad);
     }
 
@@ -310,12 +311,13 @@ contract TinlakeManager {
 
     function recover(uint256 endEpoch) public {
         require(!glad, "TinlakeMgr/not-written-off");
-
+ 
         (uint256 recovered, , ,) = pool.disburse(endEpoch);
         uint256 payBack;
         if (end.debt() == 0) {
             payBack = min(recovered, tab / RAY);
-            daiJoin.join(address(vow), payBack);
+            dai.approve(address(daiJoin), payBack);
+            daiJoin.join(vow, payBack);
             tab = sub(tab, mul(payBack, RAY));
         }
         dai.transfer(owner, dai.balanceOf(address(this)));

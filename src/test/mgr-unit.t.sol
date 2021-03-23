@@ -119,13 +119,14 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         vat = new Vat();
 
         jug = new Jug(address(vat));
-        jug.file("vow", address(vow));
+        jug.file("vow", vow);
         vat.rely(address(jug));
 
         spotter = new Spotter(address(vat));
         vat.rely(address(spotter));
 
         daiJoin = new DaiJoin(address(vat), address(dai));
+        daiJoin_ = address(daiJoin);
         vat.rely(address(daiJoin));
         dai.setOwner(address(daiJoin));
 
@@ -172,7 +173,9 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
                                  address(this), // senior tranche
                                  seniorTranche_,
                                  end_,
-                                 address(vat));
+                                 address(vat),
+                                 vow);
+
         mgr_ = address(mgr);
 
         urn = new RwaUrn(address(vat), address(jug), address(gemJoin), address(daiJoin), mgr_);
@@ -250,7 +253,6 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
     }
 
     function migrate() public {
-         // deploy new mgr
         address newMgr = address(1);
         mgr.migrate(newMgr);
 
@@ -310,6 +312,34 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
             uint remainder = add(selfBalanceDAI, sub(redeemedDAI, cdptab));
             assertEq(dai.balanceOf(self), add(selfBalanceDAI, remainder));
         }
+    }
+
+    function recover(uint redeemedDAI, uint epochId) public {
+        uint totalSupplyDAI = dai.totalSupply();
+        uint mgrTab = mgr.tab();
+        dai.transferFrom(self, seniorOperator_, dai.balanceOf(self)); // transfer DAI to opeartor for redemption
+        uint operatorBalanceInit = dai.balanceOf(seniorOperator_);
+        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, 0);
+        
+        mgr.recover(epochId);
+
+        // assert dai were transferred from operator correctly
+        assertEq(dai.balanceOf(seniorOperator_), sub(operatorBalanceInit, redeemedDAI));      
+        uint payBack = min(redeemedDAI,  mgrTab / ONE);
+        uint surplus = 0;
+
+        if (redeemedDAI > payBack) {
+            surplus = sub(redeemedDAI, payBack);
+        }
+
+        if (end.debt() > 0) {
+            surplus = redeemedDAI;
+            payBack = 0; 
+        }
+
+        assertEq(mgr.tab(), sub(mgrTab, mul(payBack, ONE)));
+        assertEq(dai.balanceOf(self), surplus);
+        assertEq(dai.totalSupply(), sub(totalSupplyDAI, payBack));
     }
 
     function testLock() public {
@@ -445,6 +475,7 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         hevm.warp(block.timestamp + 2 weeks);
         cull();
     }
+    
 
     function testFailCullGlobalSettlement() public {
         uint wad = 100 ether;
@@ -512,10 +543,27 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
           migrate();
     }
 
-    // function testRecover(uint wad) public {
-    //      if (ceiling < wad) return; // amount has to be below ceiling
-    //     testSink(wad);
-    //     recover(wad, 1);
-    // }
+    function testFullRecover(uint128 wad) public {
+        if (ceiling < wad) return; // amount has to be below ceiling
+        testCull(wad);
+        recover(wad, 1);
+    }
 
+    function testPartialRecover(uint128 wad) public {
+        if (ceiling < wad) return; // amount has to be below ceiling
+        if (wad < 2) return; 
+        testCull(wad);
+        recover(wad/2, 1);
+    }
+
+    function testFailRecoverisGlad(uint128 wad) public {
+        recover(wad, 1);
+    }
+
+    function testRecoverGlobalSettlement(uint128 wad) public {
+        if (ceiling < wad) return; // amount has to be below ceiling
+        testCull(wad);
+        cage();
+        recover(wad, 1);
+    }
 }
