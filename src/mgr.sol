@@ -273,15 +273,15 @@ contract TinlakeManager {
 
         (, uint256 art) = vat.urns(ilk, address(urn));
         (, uint256 rate, , ,) = vat.ilks(ilk);
-        tab = mul(art, rate);
+        uint256 tab_ = mul(art, rate);
 
-        uint256 payBack = min(redeemed, divup(tab, RAY));
+        uint256 payBack = min(redeemed, divup(tab_, RAY));
         dai.transferFrom(address(this), address(urn), payBack);
         urn.wipe(payBack);
 
         // Return possible remainder to the owner
         dai.transfer(owner, dai.balanceOf(address(this)));
-        tab = sub(tab, mul(payBack, RAY));
+        tab = sub(tab_, mul(payBack, RAY));
         emit Unwind(payBack);
     }
 
