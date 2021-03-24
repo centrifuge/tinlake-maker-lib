@@ -6,9 +6,7 @@ import "../mgr.sol";
 import { Mock } from "./mocks/mock.sol";
 import { TrancheMock } from "./mocks/tranche.sol";
 import { OperatorMock } from "./mocks/operator.sol";
-import { VowMock } from "./mocks/vow.sol";
 import { EndMock } from "./mocks/end.sol";
-import { DaiJoinMock } from "./mocks/daijoin.sol";
 import { Dai } from "dss/dai.sol";
 import { Vat } from "dss/vat.sol";
 import { Jug } from 'dss/jug.sol';
@@ -320,11 +318,11 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         dai.transferFrom(self, seniorOperator_, dai.balanceOf(self)); // transfer DAI to opeartor for redemption
         uint operatorBalanceInit = dai.balanceOf(seniorOperator_);
         seniorOperator.setDisburseValues(redeemedDAI, 0, 0, 0);
-        
+
         mgr.recover(epochId);
 
         // assert dai were transferred from operator correctly
-        assertEq(dai.balanceOf(seniorOperator_), sub(operatorBalanceInit, redeemedDAI));      
+        assertEq(dai.balanceOf(seniorOperator_), sub(operatorBalanceInit, redeemedDAI));
         uint payBack = min(redeemedDAI,  mgrTab / ONE);
         uint surplus = 0;
 
@@ -334,7 +332,7 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
 
         if (end.debt() > 0) {
             surplus = redeemedDAI;
-            payBack = 0; 
+            payBack = 0;
         }
 
         assertEq(mgr.tab(), sub(mgrTab, mul(payBack, ONE)));
@@ -475,7 +473,7 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         hevm.warp(block.timestamp + 2 weeks);
         cull();
     }
-    
+
 
     function testFailCullGlobalSettlement() public {
         uint wad = 100 ether;
@@ -551,7 +549,7 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
 
     function testPartialRecover(uint128 wad) public {
         if (ceiling < wad) return; // amount has to be below ceiling
-        if (wad < 2) return; 
+        if (wad < 2) return;
         testCull(wad);
         recover(wad/2, 1);
     }
