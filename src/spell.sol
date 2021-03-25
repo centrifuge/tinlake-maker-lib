@@ -40,23 +40,22 @@ interface RwaUrnLike {
 
 contract SpellAction {
     // KOVAN ADDRESSES
-    //
     // The contracts in this list should correspond to MCD core contracts, verify
     // against the current release list at:
     //     https://changelog.makerdao.com/releases/kovan/latest/contracts.json
     ChainlogAbstract constant CHANGELOG =
         ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
 
-    address constant NS2DRP_OPERATOR           = 0x27EfE12d1bede473960859E85375FaB75F4C9ffa; // mgr
-    // RWA addresses
-    address constant NS2DRP_GEM                = 0x8F9A8cbBdfb93b72d646c8DEd6B4Fe4D86B315cB;
-    address constant MCD_JOIN_NS2DRP_A         = 0x029A554f252373e146f76Fa1a7455f73aBF4d38e;
-    address constant NS2DRP_A_URN              = 0x3Ba90D86f7E3218C48b7E0FCa959EcF43d9A30F4;
-    address constant NS2DRP_A_INPUT_CONDUIT    = 0xe37673730F03060922a2Bd8eC5987AfE3eA16a05;
-    address constant NS2DRP_A_OUTPUT_CONDUIT   = 0xc54fEee07421EAB8000AC8c921c0De9DbfbE780B;
-    address constant MIP21_LIQUIDATION_ORACLE  = 0x2881c5dF65A8D81e38f7636122aFb456514804CC;
+    address constant NS2DRP_OPERATOR           = 0x27EfE12d1bede473960859E85375FaB75F4C9ffa;
+    address constant NS2DRP_GEM                = 0xAA2d2B3F105Cb9E191DF77B48f2348F4cfD7c75D;
+    address constant MCD_JOIN_NS2DRP_A         = 0xe99C6f7EB6E4D4ca47F2588aaD6f0f1e673E4621;
+    address constant NS2DRP_A_URN              = 0xc0B8F156F1EDa2981BD6ce920F1Dceaa72B57a2e;
+    address constant NS2DRP_A_INPUT_CONDUIT    = 0x27EfE12d1bede473960859E85375FaB75F4C9ffa;
+    address constant NS2DRP_A_OUTPUT_CONDUIT   = 0x27EfE12d1bede473960859E85375FaB75F4C9ffa;
+    address constant MIP21_LIQUIDATION_ORACLE  = 0xB866339a929BB5a8956A66aAc513cF04f379F159;
 
     uint256 constant NS2DRP_THREEPOINTSIX_PERCENT_RATE = 1000000001121484774769253326;
+
 
     // precision
     uint256 constant public THOUSAND = 10 ** 3;
@@ -65,12 +64,12 @@ contract SpellAction {
     uint256 constant public RAY      = 10 ** 27;
     uint256 constant public RAD      = 10 ** 45;
 
-    uint256 constant NS2DRP_A_INITIAL_DC    = 5 * MILLION * RAD;
+    uint256 constant NS2DRP_A_INITIAL_DC    = 5 * MILLION * RAD; 
     uint256 constant NS2DRP_A_INITIAL_PRICE = 1060 * WAD; // value ???
 
     // MIP13c3-SP4 Declaration of Intent & Commercial Points -
-    //   Off-Chain Asset Backed Lender to onboard Real World Assets
-    //   as Collateral for a DAI loan
+    // Off-Chain Asset Backed Lender to onboard Real World Assets
+    // as Collateral for a DAI loan
     //
     // https://ipfs.io/ipfs/QmdmAUTU3sd9VkdfTZNQM6krc9jsKgF2pz7W1qvvfJo1xk
     string constant DOC = "QmdmAUTU3sd9VkdfTZNQM6krc9jsKgF2pz7W1qvvfJo1xk";
@@ -123,7 +122,7 @@ contract SpellAction {
         // Allow RwaLiquidationOracle to modify Vat registry
         VatAbstract(MCD_VAT).rely(MIP21_LIQUIDATION_ORACLE);
 
-        // 1000 debt ceiling
+        // 5 Million debt ceiling
         VatAbstract(MCD_VAT).file(ilk, "line", NS2DRP_A_INITIAL_DC);
         VatAbstract(MCD_VAT).file("Line", VatAbstract(MCD_VAT).Line() + NS2DRP_A_INITIAL_DC);
 
