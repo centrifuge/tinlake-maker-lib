@@ -3,8 +3,8 @@ clean  :; dapp clean
 update:
 	dapp update
 build: update
-	dapp --use solc:0.5.15 build
+	dapp --use solc:0.5.12 build
 test: update
-	dapp --use solc:0.5.15 test
+	dapp --use solc:0.5.12 test
 deploy: build
 	dapp create TinlakeMakerLib

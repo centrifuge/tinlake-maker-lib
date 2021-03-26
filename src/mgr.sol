@@ -16,7 +16,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity 0.5.12;
+pragma solidity =0.5.12;
 
 interface GemLike {
     function decimals() external view returns (uint256);
@@ -36,59 +36,51 @@ interface EndLike {
     function debt() external returns (uint256);
 }
 
-interface VatLike {
-    function live() external view returns (uint256);
-    function slip(bytes32,address,int256) external;
-    function flux(bytes32,address,address,uint256) external;
-    function ilks(bytes32) external returns (uint256,uint256,uint256,uint256,uint256);
-    function urns(bytes32,address) external returns (uint256,uint256);
-    function move(address,address,uint256) external;
-    function frob(bytes32,address,address,address,int256,int256) external;
-    function grab(bytes32,address,address,address,int256,int256) external;
-    function gem(bytes32,address) external returns (uint256);
-    function hope(address) external;
-}
-
 interface RedeemLike {
     function redeemOrder(uint256) external;
     function disburse(uint256) external returns (uint256,uint256,uint256,uint256);
 }
 
-// This contract is essentially a merge of
-// a join and a cdp-manager.
+interface VatLike {
+    function urns(bytes32,address) external returns (uint256,uint256);
+    function ilks(bytes32) external returns (uint256,uint256,uint256,uint256,uint256);
+    function live() external returns(uint);
+}
 
-// It manages only one urn, which can be liquidated in two stages:
-// 1) In the first stage, set safe = false and call
-// pool.disburse() to try to recover as much dai as possible.
+interface GemJoinLike {
+    function gem() external returns (address);
+    function ilk() external returns (bytes32);
+}
 
-// 2) After the first liquidation period has completed, we either managed to redeem
-// enough dai to wipe off all cdp debt, or this debt needs to be written off
-// and addded to the sin.
+interface MIP21UrnLike {
+    function lock(uint256 wad) external;
+    function free(uint256 wad) external;
+    // n.b. DAI can only go to the output conduit
+    function draw(uint256 wad) external;
+    // n.b. anyone can wipe
+    function wipe(uint256 wad) external;
+    function quit() external;
+    function gemJoin() external returns (address);
+}
 
-// Note that the internal gem created as a result of `join` through this manager is
-// not only DROP as an ERC20 balance in this contract, but also what's currently
-// undergoing redemption from the Tinlake pool.
+interface MIP21LiquidationLike {
+    function ilks(bytes32 ilk) external returns (string memory, address, uint48, uint48);
+}
 
 contract TinlakeManager {
     // --- Auth ---
     mapping (address => uint256) public wards;
+
     function rely(address usr) external auth {
-        require(live, "TinlakeMgr/not-live");
         wards[usr] = 1;
         emit Rely(usr);
     }
     function deny(address usr) external auth {
-        require(live, "TinlakeMgr/not-live");
         wards[usr] = 0;
         emit Deny(usr);
     }
     modifier auth {
         require(wards[msg.sender] == 1, "TinlakeMgr/not-authorized");
-        _;
-    }
-
-    modifier operatorOnly {
-        require(msg.sender == operator, "TinlakeMgr/operator-only");
         _;
     }
 
@@ -99,24 +91,19 @@ contract TinlakeManager {
     event Wipe(uint256 wad);
     event Join(uint256 wad);
     event Exit(uint256 wad);
-    event SetOperator(address indexed usr);
     event Tell(uint256 wad);
     event Unwind(uint256 payBack);
-    event Sink(uint256 ink, uint256 tab);
+    event Cull(uint256 tab);
     event Recover(uint256 recovered, uint256 payBack);
     event Cage();
     event File(bytes32 indexed what, address indexed data);
     event Migrate(address indexed dst);
 
-    // The operator manages the cdp, but is not authorized to call kick or cage.
-    address public operator;
-
     bool public safe; // Soft liquidation not triggered
     bool public glad; // Write-off not triggered
     bool public live; // Global settlement not triggered
 
-    uint256 public tab;  // Dai written off
-    bytes32 public ilk; // name of the collateral type
+    uint256 public tab;  // Dai owed
 
     // --- Contracts ---
     // dss components
@@ -128,42 +115,36 @@ contract TinlakeManager {
 
     // Tinlake components
     GemLike      public gem;
-    GemLike      public tin;
     RedeemLike   public pool;
 
-    uint256 public constant dec = 18;
+    // MIP21 RWAUrn
+    MIP21UrnLike public urn;
+    MIP21LiquidationLike public liq;
 
     address public tranche;
+    address public owner;
 
-    constructor(address vat_,      address dai_,
-                address daiJoin_,  address vow_,
-                address drop_,     address pool_,
-                address operator_, address tranche_,
-                address end_,      bytes32 ilk_
+    constructor(address dai_,   address daiJoin_,
+                address drop_,  address pool_,
+                address owner_, address tranche_,
+                address end_,   address vat_,
+                address vow_
                 ) public {
-
-        vat = VatLike(vat_);
         dai = GemLike(dai_);
-        end = EndLike(end_);
         daiJoin = JoinLike(daiJoin_);
+        vat = VatLike(vat_);
         vow = vow_;
-
+        end = EndLike(end_);
         gem = GemLike(drop_);
-        require(gem.decimals() == dec, "TinlakeMgr/decimals-dont-match");
+
         pool = RedeemLike(pool_);
 
-        ilk = ilk_;
         wards[msg.sender] = 1;
         emit Rely(msg.sender);
 
-        operator = operator_;
-
         safe = true;
-        live = true;
         glad = true;
-
-        dai.approve(daiJoin_, uint256(-1));
-        vat.hope(daiJoin_);
+        live = true;
 
         tranche = tranche_;
     }
@@ -186,56 +167,60 @@ contract TinlakeManager {
         z = x > y ? y : x;
     }
 
-    // --- Vault Operation---
+
+    // --- Gem Operation ---
+    // moves the rwaToken into the vault
+    // requires that mgr contract holds the rwaToken
+    function lock(uint256 wad) public auth {
+        GemLike(GemJoinLike(urn.gemJoin()).gem()).approve(address(urn), uint256(wad));
+        urn.lock(wad);
+    }
+    // moves the rwaToken into the vault
+    // requires that mgr contract holds the rwaToken
+    function free(uint256 wad) public auth {
+        urn.free(wad);
+    }
+
+    // --- DROP Operation ---
     // join & exit move the gem directly into/from the urn
-    function join(uint256 wad) public operatorOnly {
+    function join(uint256 wad) public auth {
         require(safe && live, "TinlakeManager/bad-state");
         require(int256(wad) >= 0, "TinlakeManager/overflow");
         gem.transferFrom(msg.sender, address(this), wad);
-        vat.slip(ilk, address(this), int256(wad));
-        vat.frob(ilk, address(this), address(this), address(this), int256(wad), 0);
         emit Join(wad);
     }
 
-    function exit(uint256 wad) public operatorOnly {
+    function exit(uint256 wad) public auth {
         require(safe && live, "TinlakeManager/bad-state");
         require(wad <= 2 ** 255, "TinlakeManager/overflow");
-        vat.frob(ilk, address(this), address(this), address(this), -int256(wad), 0);
-        vat.slip(ilk, address(this), -int256(wad));
         gem.transfer(msg.sender, wad);
         emit Exit(wad);
     }
 
+    // --- DAI Operation ---
     // draw & wipe call daiJoin.exit/join immediately
-    function draw(uint256 wad) public operatorOnly {
+    function draw(uint256 wad) public auth {
         require(safe && live, "TinlakeManager/bad-state");
-        (, uint256 rate, , , ) = vat.ilks(ilk);
-        uint256 dart = divup(mul(RAY, wad), rate);
-        require(int256(dart) >= 0, "TinlakeManager/overflow");
-        vat.frob(ilk, address(this), address(this), address(this), 0, int256(dart));
-        daiJoin.exit(msg.sender, wad);
+        urn.draw(wad);
+        dai.transfer(msg.sender, wad);
         emit Draw(wad);
     }
 
-    function wipe(uint256 wad) public operatorOnly {
+    function wipe(uint256 wad) public {
         require(safe && live, "TinlakeManager/bad-state");
-        dai.transferFrom(msg.sender, address(this), wad);
-        daiJoin.join(address(this), wad);
-        (,uint256 rate, , , ) = vat.ilks(ilk);
-        uint256 dart = mul(RAY, wad) / rate;
-        require(dart <= 2 ** 255, "TinlakeManager/overflow");
-        vat.frob(ilk, address(this), address(this), address(this), 0, -int256(dart));
+        dai.transferFrom(msg.sender, address(urn), wad);
+        urn.wipe(wad);
         emit Wipe(wad);
     }
 
-    // --- Administration ---
-    function setOperator(address newOperator) external operatorOnly  {
-        operator = newOperator;
-        emit SetOperator(newOperator);
+    // Take DAI from the urn in case there is any in the Urn
+    // can be dealt with through migrate() after ES
+    function quit(uint256 wad) public auth {
+        urn.quit();
     }
 
-    function migrate(address dst) public auth  {
-        vat.hope(dst);
+    // --- Administration ---
+    function migrate(address dst) public auth {
         dai.approve(dst, uint256(-1));
         gem.approve(dst, uint256(-1));
         live = false;
@@ -243,86 +228,105 @@ contract TinlakeManager {
     }
 
     function file(bytes32 what, address data) public auth {
-        require(live, "TinlakeManager/not-live");
         emit File(what, data);
-        if (what == "vow") vow = data;
-        else if (what == "daiJoin") daiJoin = JoinLike(data);
-        else if (what == "end")  end = EndLike(data);
-        else revert("Vat/file-unrecognized-param");
+        if (what == "urn") {
+            urn = MIP21UrnLike(data);
+            dai.approve(data, uint256(-1));
+        }
+        else if (what == "liq") {
+            liq = MIP21LiquidationLike(data);
+        }
+        else if (what == "owner") {
+            owner = data;
+        }
+        else if (what == "pool") {
+            pool = RedeemLike(data);
+        }
+        else if (what == "tranche") {
+            tranche = data;
+        }
+        else revert("TinlakeMgr/file-unknown-param");
     }
 
     // --- Liquidation ---
-    function tell() public auth {
-        require(safe, "TinlakeManager/not-safe");
-        (uint256 ink, ) = vat.urns(ilk, address(this));
+    // triggers a soft liquidation of the DROP collateral
+    // a redeemOrder is submitted to receive DAI back
+    function tell() public {
+        require(safe, "TinlakeMgr/not-safe");
+        bytes32 ilk = GemJoinLike(urn.gemJoin()).ilk();
+
+        (,,, uint48 toc) = liq.ilks(ilk);
+        require(toc != 0, "TinlakeMgr/not-liquidated");
+
+        (, uint256 art) = vat.urns(ilk, address(urn));
+        (, uint256 rate, , ,) = vat.ilks(ilk);
+        tab = mul(art, rate);
+
+        uint256 ink = gem.balanceOf(address(this));
         safe = false;
         gem.approve(tranche, ink);
         pool.redeemOrder(ink);
         emit Tell(ink);
     }
 
+    // triggers the payout of a DROP redemption
+    // method can be called multiple times after the liquidation until all
+    // DROP tokens are redeemed
     function unwind(uint256 endEpoch) public {
-        require(!safe && glad && live, "TinlakeManager/not-soft-liquidation");
-        (uint256 redeemed, , ,uint256 remainingDrop) = pool.disburse(endEpoch);
-        (uint256 ink, uint256 art) = vat.urns(ilk, address(this));
-        uint256 dropReturned = sub(ink, remainingDrop);
-        require(dropReturned <= 2 ** 255, "TinlakeManager/overflow");
+        require(!safe && glad && live, "TinlakeMgr/not-soft-liquidation");
 
+        (uint256 redeemed, , ,) = pool.disburse(endEpoch);
+        bytes32 ilk = GemJoinLike(urn.gemJoin()).ilk();
+
+        (, uint256 art) = vat.urns(ilk, address(urn));
         (, uint256 rate, , ,) = vat.ilks(ilk);
-        uint256 cdptab = mul(art, rate);
-        uint256 payBack = min(redeemed, divup(cdptab, RAY));
+        uint256 tab_ = mul(art, rate);
 
-        daiJoin.join(address(this), payBack);
-        // Repay dai debt up to the full amount
-        // and exit the gems used up
-        uint256 dart = mul(RAY, payBack) / rate;
-        require(dart <= 2 ** 255, "TinlakeManager/overflow");
-        vat.frob(ilk, address(this), address(this), address(this),
-                 0, -int256(dart));
-        vat.grab(ilk, address(this), address(this), address(this),
-                 -int256(dropReturned), 0);
-        vat.slip(ilk, address(this), -int256(dropReturned));
+        uint256 payBack = min(redeemed, divup(tab_, RAY));
+        dai.transferFrom(address(this), address(urn), payBack);
+        urn.wipe(payBack);
+
         // Return possible remainder to the owner
-        dai.transfer(operator, dai.balanceOf(address(this)));
+        dai.transfer(owner, dai.balanceOf(address(this)));
+        tab = sub(tab_, mul(payBack, RAY));
         emit Unwind(payBack);
     }
 
-    // --- Writeoff ---
-    function sink() public auth {
-        require(!safe && glad && live, "TinlakeManager/bad-state");
-        (uint256 ink, uint256 art) = vat.urns(ilk, address(this));
-        require(ink <= 2 ** 255, "TinlakeManager/overflow");
-        require(art <= 2 ** 255, "TinlakeManager/overflow");
-        (, uint256 rate, , ,) = vat.ilks(ilk);
-        vat.grab(ilk,
-                 address(this),
-                 address(this),
-                 address(vow),
-                 -int256(ink),
-                 -int256(art));
-        vat.slip(ilk, address(this), -int256(ink));
-        tab = mul(rate, art);
+    // --- Write-off ---
+    // can be called after RwaLiquidationOracle.cull()
+    function cull() public {
+        require(!safe && glad && live, "TinlakeMgr/bad-state");
+        bytes32 ilk = GemJoinLike(urn.gemJoin()).ilk();
+
+        (uint256 ink, uint256 art) = vat.urns(ilk, address(urn));
+        require(ink == 0 && art == 0, "TinlakeMgr/not-written-off");
+
+        (,, uint48 tau, uint48 toc) = liq.ilks(ilk);
+        require(toc != 0, "TinlakeMgr/not-liquidated");
+        require(block.timestamp >= add(toc, tau), "TinlakeMgr/early-cull");
+
         glad = false;
-        emit Sink(ink, tab);
+        emit Cull(tab);
     }
 
     function recover(uint256 endEpoch) public {
-        require(!glad, "TinlakeManager/not-written-off");
-
+        require(!glad, "TinlakeMgr/not-written-off");
+ 
         (uint256 recovered, , ,) = pool.disburse(endEpoch);
         uint256 payBack;
         if (end.debt() == 0) {
             payBack = min(recovered, tab / RAY);
-            daiJoin.join(address(vow), payBack);
+            dai.approve(address(daiJoin), payBack);
+            daiJoin.join(vow, payBack);
             tab = sub(tab, mul(payBack, RAY));
         }
-        dai.transfer(operator, dai.balanceOf(address(this)));
+        dai.transfer(owner, dai.balanceOf(address(this)));
         emit Recover(recovered, payBack);
     }
 
     function cage() external {
-        require(!glad, "TinlakeManager/bad-state");
-        require(wards[msg.sender] == 1 || vat.live() == 0, "TinlakeManager/not-authorized");
+        require(!glad, "TinlakeMgr/bad-state");
+        require(wards[msg.sender] == 1 || vat.live() == 0, "TinlakeMgr/not-authorized");
         live = false;
         emit Cage();
     }

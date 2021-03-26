@@ -1,18 +1,26 @@
-pragma solidity >=0.5.12;
+pragma solidity =0.5.12;
 
 
 import "../mgr.sol";
- import {Mock} from "../../lib/tinlake/src/test/mock/mock.sol";
-import { TrancheMock } from "../../lib/tinlake/src/lender/test/mock/tranche.sol";
-import { OperatorMock } from "./mocks/tinlake/operator.sol";
-import { SimpleToken } from "../../lib/tinlake/src/test/simple/token.sol";
-import { VatMock } from "./mocks/vat.sol";
-import { VowMock } from "./mocks/vow.sol";
+
+import { Mock } from "./mocks/mock.sol";
+import { TrancheMock } from "./mocks/tranche.sol";
+import { OperatorMock } from "./mocks/operator.sol";
 import { EndMock } from "./mocks/end.sol";
-import { DaiJoinMock } from "./mocks/daijoin.sol";
-import { SpotterMock } from "./mocks/spotter.sol";
 import { Dai } from "dss/dai.sol";
+import { Vat } from "dss/vat.sol";
+import { Jug } from 'dss/jug.sol';
+import { Spotter } from "dss/spot.sol";
+
+import { RwaToken } from "rwa-example/RwaToken.sol";
+import { RwaUrn } from "rwa-example/RwaUrn.sol";
+import { RwaLiquidationOracle } from "rwa-example/RwaLiquidationOracle.sol";
+import { DaiJoin } from 'dss/join.sol';
+import { AuthGemJoin } from "dss-gem-joins/join-auth.sol";
+
+import "ds-token/token.sol";
 import "ds-test/test.sol";
+import "ds-math/math.sol";
 
 interface Hevm {
     function warp(uint) external;
@@ -20,7 +28,7 @@ interface Hevm {
     function load(address,bytes32) external returns (bytes32);
 }
 
-contract TinlakeManagerUnitTest is DSTest {
+contract TinlakeManagerUnitTest is DSTest, DSMath {
     uint constant ONE = 10 ** 27;
 
     function add(uint x, uint y) internal pure returns (uint z) {
@@ -44,39 +52,111 @@ contract TinlakeManagerUnitTest is DSTest {
         z = x > y ? y : x;
     }
 
+    function rad(uint wad) internal pure returns (uint) {
+        return wad * 10 ** 27;
+    }
+
     // Maker
-    DaiJoinMock daiJoin;
-    SpotterMock spotter;
-    VowMock vow;
-    VatMock vat;
+    DaiJoin daiJoin;
     EndMock end;
-    Dai dai;
-    address dai_;
-    address vat_;
+    DSToken dai;
+    Vat vat;
+    DSToken gov;
+    RwaToken rwa;
+    AuthGemJoin gemJoin;
+    RwaUrn urn;
+    RwaLiquidationOracle oracle;
+    Jug jug;
+    Spotter spotter;
+
     address daiJoin_;
-    address vow_;
+    address gemJoin_;
+    address dai_;
+    address vow = address(123);
     address end_;
+    address urn_;
     bytes32 constant ilk = "DROP"; // New Collateral Type
 
     // Tinlake
-    SimpleToken drop;
+    DSToken drop;
     TrancheMock seniorTranche;
     OperatorMock seniorOperator;
+    TinlakeManager mgr;
+
     address drop_;
     address seniorTranche_;
     address seniorOperator_;
-
-    TinlakeManager mgr;
     address mgr_;
     address self;
 
+
     // -- testing --
     Hevm constant hevm = Hevm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
-    uint rate;
+    uint256 rate;
+    uint256 ceiling = 400 ether;
+    string doc = "Please sign on the dotted line.";
 
     function setUp() public {
-        mkrDeploy();
-        drop = new SimpleToken("DROP", "Tinlake DROP Token");
+        hevm.warp(604411200);
+        self = address(this);
+
+        dai = new DSToken("DAI");
+        dai_ = address(dai);
+
+        end = new EndMock();
+        end_ = address(end);
+
+        // deploy governance token
+        gov = new DSToken('GOV');
+        gov.mint(100 ether);
+
+        // deploy rwa token
+        rwa = new RwaToken();
+
+        // standard Vat setup
+        vat = new Vat();
+
+        jug = new Jug(address(vat));
+        jug.file("vow", vow);
+        vat.rely(address(jug));
+
+        spotter = new Spotter(address(vat));
+        vat.rely(address(spotter));
+
+        daiJoin = new DaiJoin(address(vat), address(dai));
+        daiJoin_ = address(daiJoin);
+        vat.rely(address(daiJoin));
+        dai.setOwner(address(daiJoin));
+
+        vat.init(ilk);
+        vat.file("Line", 100 * rad(ceiling));
+        vat.file(ilk, "line", rad(ceiling));
+
+        jug.init(ilk);
+        // $ bc -l <<< 'scale=27; e( l(1.08)/(60 * 60 * 24 * 365) )'
+        uint256 EIGHT_PCT = 1000000002440418608258400030;
+        jug.file(ilk, "duty", EIGHT_PCT);
+
+        oracle = new RwaLiquidationOracle(address(vat), vow);
+        oracle.init(
+            ilk,
+            wmul(ceiling, 1.1 ether),
+            doc,
+            2 weeks);
+        vat.rely(address(oracle));
+        (,address pip,,) = oracle.ilks(ilk);
+
+        spotter.file(ilk, "mat", RAY);
+        spotter.file(ilk, "pip", pip);
+        spotter.poke(ilk);
+
+        gemJoin = new AuthGemJoin(address(vat), ilk, address(rwa));
+        gemJoin_ = address(gemJoin);
+        vat.rely(gemJoin_);
+
+
+        // Tinlake Stuff
+        drop = new DSToken("DROP");
         drop_ = address(drop);
         seniorTranche = new TrancheMock();
         seniorTranche_ = address(seniorTranche);
@@ -84,84 +164,30 @@ contract TinlakeManagerUnitTest is DSTest {
         seniorOperator_ = address(seniorOperator);
         seniorTranche.depend("token", drop_);
 
-        // deploy mgr
-        mgr = new TinlakeManager(address(vat),
-                                     dai_,
-                                     daiJoin_,
-                                     vow_,
-                                     drop_, // DROP token
-                                     seniorOperator_, // senior operator
-                                     address(this),
-                                     seniorTranche_, // senior tranche
-                                     end_,
-                                     ilk);
+        mgr = new TinlakeManager(dai_,
+                                 daiJoin_,
+                                 drop_, // DROP token
+                                 seniorOperator_, // senior operator
+                                 address(this), // senior tranche
+                                 seniorTranche_,
+                                 end_,
+                                 address(vat),
+                                 vow);
+
         mgr_ = address(mgr);
-        assertEq(vat.calls("hope"), 1);
 
-        // permissions
-        vat.rely(mgr_);
-        vow.rely(mgr_);
-    }
+        urn = new RwaUrn(address(vat), address(jug), address(gemJoin), address(daiJoin), mgr_);
+        urn_ = address(urn);
+        gemJoin.rely(address(urn));
 
-   // creates all relevant mkr contracts to test the mgr
-    function mkrDeploy() public {
-        dai = new Dai(0);
-        dai_ = address(dai);
-        vat = new VatMock();
-        vat_ = address(vat);
-        daiJoin = new DaiJoinMock(dai_);
-        daiJoin_ = address(daiJoin);
-        spotter = new SpotterMock();
-        vow = new VowMock();
-        vow_ = address(vow);
-        end = new EndMock();
-        end_ = address(end);
-        self = address(this);
+        // fund mgr with rwa
+        rwa.transfer(mgr_, 1 ether);
+        assertEq(rwa.balanceOf(mgr_), 1 ether);
 
-        // setup permissions
-        dai.rely(daiJoin_);
-    }
-
-    function join(uint wad) public {
-        uint mgrBalanceDROP = drop.balanceOf(mgr_);
-        uint selfBalanceDROP = drop.balanceOf(self);
-
-        mgr.join(wad);
-        vat.setInk(wad); // helper
-
-        // assert collateral transferred
-        assertEq(drop.balanceOf(mgr_), add(mgrBalanceDROP, wad));
-        assertEq(drop.balanceOf(self), sub(selfBalanceDROP, wad));
-
-        // assert slip was called with correct values
-        assertEq(vat.calls("slip"), 1);
-        assertEq(vat.values_address("slip_usr"), mgr_);
-        assertEq(vat.values_bytes32("slip_ilk"), mgr.ilk());
-        assertEq(vat.values_int("slip_wad"), int(wad));
-
-        // assert frob was called with correct values
-        assertEq(vat.calls("frob"), 1);
-        assertEq(vat.values_bytes32("frob_i"), mgr.ilk());
-        assertEq(vat.values_address("frob_u"), mgr_);
-        assertEq(vat.values_address("frob_v"), mgr_);
-        assertEq(vat.values_address("frob_w"), mgr_);
-        assertEq(vat.values_int("frob_dink"), int(wad));
-        assertEq(vat.values_int("frob_dart"), 0);
-    }
-
-    function tell() public {
-        // put collateral into cdp
-        uint128 wad = 100 ether;
-        testJoin(wad);
-
-        mgr.tell();
-
-        // safe flipped to false
-        assert(!mgr.safe());
-        // redeemOrder was called with correct values
-        assertEq(vat.calls("urns"), 1);
-        assertEq(seniorOperator.calls("redeemOrder"), 1);
-        assertEq(seniorOperator.values_uint("redeemOrder_wad"), wad);
+        // auth user to operate
+        urn.hope(mgr_);
+        mgr.file("urn", address(urn));
+        mgr.file("liq", address(oracle));
     }
 
     function cage() public {
@@ -170,11 +196,25 @@ contract TinlakeManagerUnitTest is DSTest {
         assert(!mgr.glad());
     }
 
-    function changeOperator() public {
-        // change mgr operator to different address
-        address random_ = address(new TrancheMock());
-        mgr.setOperator(random_);
-        assertEq(mgr.operator(), random_);
+    function lock(uint wad) public {
+      uint initialMgrBalance = rwa.balanceOf(mgr_);
+      uint initialJoinBalance = rwa.balanceOf(gemJoin_);
+
+      mgr.lock(wad);
+
+      assertEq(rwa.balanceOf(mgr_), sub(initialMgrBalance, wad));
+      assertEq(rwa.balanceOf(gemJoin_), add(initialJoinBalance, wad));
+    }
+
+    function join(uint wad) public {
+        uint mgrBalanceDROP = drop.balanceOf(mgr_);
+        uint selfBalanceDROP = drop.balanceOf(self);
+
+        mgr.join(wad);
+
+        // assert collateral transferred
+        assertEq(drop.balanceOf(mgr_), add(mgrBalanceDROP, wad));
+        assertEq(drop.balanceOf(self), sub(selfBalanceDROP, wad));
     }
 
     function exit(uint wad) public {
@@ -182,27 +222,10 @@ contract TinlakeManagerUnitTest is DSTest {
         uint selfBalanceDROP = drop.balanceOf(self);
 
         mgr.exit(wad);
-        vat.setInk(sub(mgrBalanceDROP, wad)); // helper
 
         // assert collateral was transferred correctly from mgr
         assertEq(drop.balanceOf(mgr_), sub(mgrBalanceDROP, wad));
         assertEq(drop.balanceOf(self), add(selfBalanceDROP, wad));
-
-
-         // assert slip was called with correct values
-        assertEq(vat.calls("slip"), 2); // 1 call on join + 1 call on exit
-        assertEq(vat.values_address("slip_usr"), mgr_);
-        assertEq(vat.values_bytes32("slip_ilk"), mgr.ilk());
-        assertEq(vat.values_int("slip_wad"), -int(wad));
-
-        // assert frob was called with correct values
-        assertEq(vat.calls("frob"), 2); // 1 call on join + 1 call on exit
-        assertEq(vat.values_bytes32("frob_i"), mgr.ilk());
-        assertEq(vat.values_address("frob_u"), mgr_);
-        assertEq(vat.values_address("frob_v"), mgr_);
-        assertEq(vat.values_address("frob_w"), mgr_);
-        assertEq(vat.values_int("frob_dink"), -int(wad));
-        assertEq(vat.values_int("frob_dart"), 0);
     }
 
     function draw(uint wad) public {
@@ -210,18 +233,10 @@ contract TinlakeManagerUnitTest is DSTest {
         uint totalSupplyDAI = dai.totalSupply();
 
         mgr.draw(wad);
+
         // check DAI were minted & transferred correctly
         assertEq(dai.balanceOf(self), add(selfBalanceDAI, wad));
-        // assertEq(dai.totalSupply(), sub(totalSupplyDAI, wad));
-
-        // assert frob was called with correct values
-        assertEq(vat.calls("frob"), 1);
-        assertEq(vat.values_bytes32("frob_i"), mgr.ilk());
-        assertEq(vat.values_address("frob_u"), mgr_);
-        assertEq(vat.values_address("frob_v"), mgr_);
-        assertEq(vat.values_address("frob_w"), mgr_);
-        assertEq(vat.values_int("frob_dink"), 0);
-        assertEq(vat.values_int("frob_dart"), int(wad));
+        assertEq(dai.totalSupply(), add(totalSupplyDAI, wad));
     }
 
     function wipe(uint wad) public {
@@ -232,364 +247,148 @@ contract TinlakeManagerUnitTest is DSTest {
 
         // check DAI were transferred & burned
         assertEq(dai.balanceOf(self), sub(selfBalanceDAI, wad));
-        // assertEq(dai.totalSupply(), sub(totalSupplyDAI, wad));
-
-        // assert frob was called with correct values
-        assertEq(vat.calls("frob"), 2); // 1 call on draw &  1 call on wipe
-        assertEq(vat.values_bytes32("frob_i"), mgr.ilk());
-        assertEq(vat.values_address("frob_u"), mgr_);
-        assertEq(vat.values_address("frob_v"), mgr_);
-        assertEq(vat.values_address("frob_w"), mgr_);
-        assertEq(vat.values_int("frob_dink"), 0);
-        assertEq(vat.values_int("frob_dart"), -int(wad));
-    }
-
-    function unwind(uint128 art, uint128 redeemedDAI, uint gem, uint remainingDROP) public {
-        // setup mocks
-        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, remainingDROP);
-        vat.setArt(art);
-        vat.setInk(gem);
-
-        uint selfBalanceDAI = dai.balanceOf(self);
-        uint totalSupplyDAI = dai.totalSupply();
-
-        mgr.unwind(1);
-
-        uint payback = min(art, redeemedDAI);
-        uint returnedDROP = sub(gem, remainingDROP);
-
-         // make sure redeemed DAI were burned
-        assertEq(dai.totalSupply(), sub(totalSupplyDAI, payback));
-
-        // assert frob was called with correct values
-        assertEq(vat.calls("frob"), 2); // 1 call on tell&join & 1 call on unwind
-        assertEq(vat.values_bytes32("frob_i"), mgr.ilk());
-        assertEq(vat.values_address("frob_u"), mgr_);
-        assertEq(vat.values_address("frob_v"), mgr_);
-        assertEq(vat.values_address("frob_w"), mgr_);
-        assertEq(vat.values_int("frob_dink"), 0);
-        assertEq(vat.values_int("frob_dart"), -int(payback));
-
-        // assert slip was called with correct values
-        assertEq(vat.calls("slip"), 2); // 1 call on tell&join & 1 call on unwind
-        assertEq(vat.values_address("slip_usr"), mgr_);
-        assertEq(vat.values_bytes32("slip_ilk"), mgr.ilk());
-        assertEq(vat.values_int("slip_wad"), -int(returnedDROP));
-
-        // make sure remainder was transferred to operator correctly
-        if (redeemedDAI > art) {
-            uint remainder = selfBalanceDAI + (redeemedDAI - art);
-            assertEq(dai.balanceOf(self), add(selfBalanceDAI, remainder));
-        }
-    }
-
-    function sink(uint art, uint ink) public {
-        vat.setInk(ink);
-        vat.setArt(art);
-
-        // assert
-        mgr.sink();
-
-        // assert grab was called with correct values
-        assertEq(vat.calls("grab"), 1);
-        assertEq(vat.values_bytes32("grab_i"), mgr.ilk());
-        assertEq(vat.values_address("grab_u"), mgr_);
-        assertEq(vat.values_address("grab_v"), mgr_);
-        assertEq(vat.values_address("grab_w"), vow_);
-        assertEq(vat.values_int("grab_dink"), -int(ink));
-        assertEq(vat.values_int("grab_dart"), -int(art));
-
-        // assert slip was called with correct values
-        assertEq(vat.calls("slip"), 2); // 1 call on join & 1 call on sink
-        assertEq(vat.values_address("slip_usr"), mgr_);
-        assertEq(vat.values_bytes32("slip_ilk"), mgr.ilk());
-        assertEq(vat.values_int("slip_wad"), -int(ink));
-
-        // assert correct DAI amount was written off
-        uint tab = mul(vat.values_uint("rate"), art);
-        assertEq(mgr.tab(), tab);
-
-        // assert sink called
-        assert(!mgr.glad());
+       // assertEq(dai.totalSupply(), sub(totalSupplyDAI, wad));
     }
 
     function migrate() public {
-         // deploy new mgr
-        TinlakeManager newMgr = new TinlakeManager(address(vat),
-                                    dai_,
-                                    daiJoin_,
-                                    vow_,
-                                    drop_, // DROP token
-                                    seniorOperator_, // senior operator
-                                    address(this),
-                                    seniorTranche_, // senior tranche
-                                    end_,
-                                    ilk);
-        address newMgr_ = address(newMgr);
+        address newMgr = address(1);
+        mgr.migrate(newMgr);
 
-        mgr.migrate(newMgr_);
 
-        // assert hope was called
-        assertEq(vat.calls("hope"), 3); // 2 x for daijoin inside mgr constructor + 1 x in hope
         // check allowance set for dai & collateral
-        assertEq(dai.allowance(mgr_, newMgr_), uint(-1));
-        assertEq(drop.allowance(mgr_, newMgr_), uint(-1));
+        assertEq(dai.allowance(mgr_, newMgr), uint256(-1));
+        assertEq(drop.allowance(mgr_, newMgr), uint256(-1));
         // assert live is set to false
         assert(!mgr.live());
     }
 
-    function recover(uint redeemedDAI, uint epochId) public {
-        // dai balance of mgr operator before take
-        uint operatorBalanceDAI = dai.balanceOf(self);
-        uint mgrTab = mgr.tab();
+    function cull() public {
+        (, uint256 art) = vat.urns(ilk, address(urn));
+        (, uint256 rate, , ,) = vat.ilks(ilk);
+        // assert correct DAI amount was written off
+        uint tab = mul(rate, art);
 
-        // mint dai that can be disbursed
-        dai.mint(seniorOperator_, redeemedDAI); // mint enough DAI for redemptio
+        oracle.cull(ilk, address(urn));
+        mgr.cull();
+
+        assertEq(mgr.tab(), tab);
+        // assert cull called
+        assert(!mgr.glad());
+    }
+
+    function tell() public {
+        // put collateral into cdp
+        uint128 wad = 100 ether;
+        testJoin(wad);
+
+        vat.file(ilk, "line", rad(0));
+        oracle.tell(ilk);
+        mgr.tell();
+
+        // safe flipped to false
+        assert(!mgr.safe());
+
+        assertEq(seniorOperator.calls("redeemOrder"), 1);
+        assertEq(seniorOperator.values_uint("redeemOrder_wad"), wad);
+    }
+
+    function unwind(uint128 redeemedDAI) public {
+        // setup mocks
         seniorOperator.setDisburseValues(redeemedDAI, 0, 0, 0);
+        (, uint256 art) = vat.urns(ilk, address(urn));
+        (, uint256 rate, , ,) = vat.ilks(ilk);
+        uint256 cdptab = mul(art, rate);
+        uint selfBalanceDAI = dai.balanceOf(self);
         uint totalSupplyDAI = dai.totalSupply();
+
+        mgr.unwind(1);
+        uint256 payback = min(redeemedDAI, divup(cdptab, RAY));
+         // make sure redeemed DAI were burned
+        assertEq(dai.totalSupply(), sub(totalSupplyDAI, payback));
+        // make sure remainder was transferred to operator correctly
+        if (redeemedDAI > cdptab) {
+            uint remainder = add(selfBalanceDAI, sub(redeemedDAI, cdptab));
+            assertEq(dai.balanceOf(self), add(selfBalanceDAI, remainder));
+        }
+    }
+
+    function recover(uint redeemedDAI, uint epochId) public {
+        uint totalSupplyDAI = dai.totalSupply();
+        uint mgrTab = mgr.tab();
+        dai.transferFrom(self, seniorOperator_, dai.balanceOf(self)); // transfer DAI to opeartor for redemption
+        uint operatorBalanceInit = dai.balanceOf(seniorOperator_);
+        seniorOperator.setDisburseValues(redeemedDAI, 0, 0, 0);
 
         mgr.recover(epochId);
 
         // assert dai were transferred from operator correctly
-        assertEq(dai.balanceOf(seniorOperator_), 0);
-
+        assertEq(dai.balanceOf(seniorOperator_), sub(operatorBalanceInit, redeemedDAI));
         uint payBack = min(redeemedDAI,  mgrTab / ONE);
         uint surplus = 0;
+
         if (redeemedDAI > payBack) {
             surplus = sub(redeemedDAI, payBack);
         }
+
         if (end.debt() > 0) {
             surplus = redeemedDAI;
             payBack = 0;
         }
 
         assertEq(mgr.tab(), sub(mgrTab, mul(payBack, ONE)));
-        assertEq(dai.balanceOf(self), add(operatorBalanceDAI, surplus));
+        assertEq(dai.balanceOf(self), surplus);
         assertEq(dai.totalSupply(), sub(totalSupplyDAI, payBack));
     }
 
-    function testRecover(uint redeemedDAI, uint epochId, uint128 art, uint128 ink) public {
-        // set glad to false & generate tab -> call sink
-        testSink(art, ink);
-        recover(redeemedDAI, epochId);
+    function testLock() public {
+      lock(1 ether);
     }
 
-
-    function testFailRecoverisGlad(uint redeemedDAI, uint epochId, uint art, uint ink) public {
-        recover(redeemedDAI, epochId);
-    }
-
-    function testRecoverNotLive(uint redeemedDAI, uint epochId, uint128 art, uint128 ink) public {
-        testSink(art, ink);
-        // set live to false, call cage
+    function testFailLockGlobalSettlement() public {
         cage();
-        // set glad to false & generate tab -> call sink
-        recover(redeemedDAI, epochId);
+        testLock();
     }
 
-    function testRecoverSettled(uint redeemedDAI, uint epochId, uint128 art, uint128 ink) public {
-        testSink(art, ink);
-        // set live to false, call cage
+    function testJoin(uint128 wad) public {
+        drop.mint(wad);
+        drop.approve(mgr_, wad);
+        join(wad);
+    }
+
+    function testFailJoinGlobalSettlement(uint128 art, uint128 ink, uint128 wad) public {
         cage();
-        end.setDebt(1);
-        // set glad to false & generate tab -> call sink
-        recover(redeemedDAI, epochId);
+        testJoin(wad);
     }
 
-
-    function testMigrate() public {
-          migrate();
+    function testFailJoinCollateralAmountTooHigh(uint128 wad) public {
+        // wad = 100 ether;
+        // mint collateral for test contract
+        uint collateralBalance = sub(wad, 1);
+        drop.mint(self, collateralBalance);
+        // approve mgr to take collateral
+        drop.approve(mgr_, collateralBalance);
+        join(wad);
     }
 
-    function testFailMigrateNoAuth() public {
-        // remove auth for mgr
-        mgr.deny(self);
-        migrate();
-    }
-
-    function testSink(uint128 art, uint128 ink) public {
-        // set safe to false, call tell
-        tell();
-        sink(art, ink);
-    }
-
-    function testFailSinkIsSafe(uint art, uint ink) public {
-         // make sure values are in valid range
-        assert((ink <= 2 ** 128 ) && (art <= 2 ** 128));
-        sink(art, ink);
-    }
-
-    function testFailSinkNotLive(uint art, uint ink) public {
-         // make sure values are in valid range
-        assert((ink <= 2 ** 128 ) && (art <= 2 ** 128));
-        // set safe to false, call tell
-        tell();
-        // set live to false, call cage
-        cage();
-        sink(art, ink);
-    }
-
-    function testFailSinkNotGlad(uint art, uint ink) public {
-          // make sure values are in valid range
-        assert((ink <= 2 ** 128 ) && (art <= 2 ** 128));
-        // set safe to false, call tell
-        tell();
-        sink(art, ink);
-        sink(art, ink); // try to sink second time
-    }
-
-    function testFailSinkNoVatAuth(uint art, uint ink) public {
-        // make sure values are in valid range
-        assert((ink <= 2 ** 128 ) && (art <= 2 ** 128));
-        // set safe to false, call tell
-        tell();
-        // revoke auth permissions from vat
-        vat.deny(mgr_);
-        sink(art, ink);
-    }
-
-    function testFailSinkInkOverFlow(uint art, uint ink) public {
-        // ink value has to produce overflow
-        assert((ink > 2 ** 255 ) && (art <= 2 ** 128));
-        // set safe to false, call tell
-        tell();
-        sink(art, ink);
-    }
-
-    function testFailSinkArtOverFlow(uint art, uint ink) public {
-        // art value has to produce overflow
-        assert((ink <= 2 ** 128 ) && (art > 2 ** 255));
-        // set safe to false, call tell
-        tell();
-        sink(art, ink);
-    }
-
-    function testUnwind(uint128 art, uint128 redeemedDAI, uint128 gem, uint128 remainingDROP) public {
-        if (remainingDROP > gem) return; // avoid overflow
-        dai.mint(seniorOperator_, redeemedDAI); // mint enough DAI for redemption
-        // trigger tell condition & set safe to false
-        tell();
-        unwind(art, redeemedDAI, gem, remainingDROP);
-    }
-
-    function testUnwindFullRepayment(uint128 redeemedDAI, uint128 gem) public {
-        uint128 art = redeemedDAI;
-        testUnwind(art, redeemedDAI, gem, 0);
-    }
-
-    function testUnwindFullRepaymentWithRemainder(uint128 redeemedDAI, uint128 gem, uint128 art) public {
-        // make sure art is smaller then redeemedDAI
-        if (art >= redeemedDAI ) return;
-        testUnwind(art, redeemedDAI, gem, 0);
-    }
-
-    function testUnwindPartialRepayment(uint128 redeemedDAI, uint128 gem, uint128 art) public {
-         if (art <= redeemedDAI ) return; // make sure art is bigger then redeemedDAI
-        testUnwind(art, redeemedDAI, gem, 0);
-    }
-
-    function testFailUnwindDropReturnedOverflow(uint128 redeemedDAI, uint128 gem, uint128 art, uint128 remainingDROP) public {
-        assert(remainingDROP > gem); // remainingDROP > gem -> gem - remainingDROP will cause overflow
-        dai.mint(seniorOperator_, redeemedDAI); // mint enough DAI for redemption
-        // trigger tell condition & set safe to false
-        tell();
-        unwind(art, redeemedDAI, gem, remainingDROP);
-    }
-
-    function testFailUnwindNotLive(uint128 art, uint128 redeemedDAI, uint128 gem, uint128 remainingDROP) public {
-        assert(remainingDROP > gem); // avoid overflow
-        dai.mint(seniorOperator_, redeemedDAI); // mint enough DAI for redemption
-        // trigger tell condition & set safe to false
-        tell();
-        // set live to false
-        cage();
-        unwind(art, redeemedDAI, gem, remainingDROP);
-    }
-
-    function testFailUnwindInsufficientDAIBalance(uint128 art, uint128 redeemedDAI, uint128 gem, uint128 remainingDROP) public {
-        assert(remainingDROP > gem && redeemedDAI > 0 ); // make sure test is not failing bc of overflow
-        // trigger tell condition & set safe to false
-        tell();
-        unwind(art, redeemedDAI, gem, remainingDROP);
-    }
-
-    function testFailUnwindSafe(uint128 art, uint128 redeemedDAI, uint128 gem, uint128 remainingDROP) public {
-        assert(remainingDROP > gem); // avoid overflow
-        dai.mint(seniorOperator_, redeemedDAI); // mint enough DAI for redemption
-        unwind(art, redeemedDAI, gem, remainingDROP);
-    }
-
-    function testWipe(uint128 wad) public {
-        testDraw(wad);
-        dai.approve(mgr_, wad);
-        wipe(wad);
-    }
-
-    function testFailWipeNotLive(uint128 wad) public {
-        // set live to false
-        cage();
-        testWipe(wad);
-    }
-
-    function testFailWipeNotSafe(uint128 wad) public {
-        // set safe to false
-        tell();
-        testWipe(wad);
-
-    }
-
-    function testFailWipeInsufficientDAIBalance(uint128 wad) public {
-       assert(wad > 0);
-        testDraw(wad - 1);
-        dai.approve(mgr_, wad);
-        wipe(wad);
-    }
-
-    function testFailWipeNoDAIApproval(uint128 wad) public {
-        assert(wad > 0);
-        testDraw(wad);
-        wipe(wad);
-    }
-
-    function testFailWipeOverflow(uint wad) public {
-        dai.mint(self, uint(-1)); // mint enough funds for the account
-        assert(wad >= 2 ** 255); // wad value has to cause overflow
-        dai.approve(mgr_, wad);
+    function testDraw(uint wad) public {
+        if (ceiling < wad) return; // amount has to be below ceiling
+        testLock();
         draw(wad);
     }
 
-    function testDraw(uint128 wad) public {
+    function testFailDrawAboveCeiling(uint wad) public {
+        assert(ceiling < wad);
+        testLock();
         draw(wad);
     }
 
-    function testFailUnwindNotGlad(uint128 art, uint128 redeemedDAI, uint128 gem, uint128 remainingDROP) public {
-        // make sure art is smaller then redeemedDAI
-        assert(art >= redeemedDAI );
-        // set glad to false, call sink
-        mgr.sink();
-        assert(!mgr.glad());
-        testUnwind(art, redeemedDAI, gem, remainingDROP);
-    }
-
-    function testFailDrawNotLive(uint128 wad) public {
-         // set live to false
+    function testFailDrawGlobalSettlement() public {
+        testLock();
         cage();
-        testDraw(wad);
-    }
-
-    function testFailDrawNotSafe(uint128 wad) public {
-         // set safe to false
-        tell();
-        testDraw(wad);
-    }
-
-    function testFailDrawOverflow(uint wad) public {
-        assert(wad >= 2 ** 255); // wad value has to cause overflow
-        draw(wad);
+        draw(add(ceiling, 1));
     }
 
     function testExit(uint128 wad) public {
-        // join collateral
         testJoin(wad);
         exit(wad);
     }
@@ -606,56 +405,36 @@ contract TinlakeManagerUnitTest is DSTest {
         exit(add(wad, 1));
     }
 
-    function testFailExitNotLive(uint128 wad) public {
+    function testFailExitGlobalSettlement(uint128 wad) public {
         // set live to false
         cage();
         testExit(wad);
     }
 
-    function testFailExitNotSafe(uint128 wad) public {
-        // set safe to false
-        tell();
-        testExit(wad);
+    function testWipe(uint128 wad) public {
+        if (ceiling < wad) return; // amount has to be below ceiling
+        testDraw(wad);
+        dai.approve(mgr_, wad);
+        wipe(wad);
     }
 
-    function testFailExitOverflow(uint128 wad) public {
-        // join collateral
-        testJoin(wad);
-        // produce overflow
-        exit(uint(-1));
-    }
-
-    function testCage(uint128 art, uint128 ink) public {
-        testSink(art, ink);
+    function testFailWipeGlobalSettlement(uint128 wad) public {
+        // set live to false
         cage();
+        testWipe(wad);
     }
 
-    function testCageVatNotLive(uint128 art, uint128 ink) public {
-        vat.setLive(0);
-        testCage(art, ink);
+    function testFailWipeInsufficientDAIBalance(uint128 wad) public {
+       assert(wad > 0);
+       testDraw(wad - 1);
+       dai.approve(mgr_, wad);
+       wipe(wad);
     }
 
-    function testFailCageNoAuth(uint128 art, uint128 ink) public {
-        // revoke access permissions from self
-        mgr.deny(self);
-        testCage(art, ink);
-    }
-
-    function testFailCageGlad() public {
-        // revoke access permissions from self
-        cage();
-    }
-
-    function testChangeOperator() public {
-        assertEq(mgr.operator(), self);
-        changeOperator();
-    }
-
-    function testFailChangeOperatorNotOperator() public {
-        assertEq(mgr.operator(), self);
-        changeOperator();
-        // self not operator of mgr anymore, try changing operator one more time
-        changeOperator();
+    function testFailWipeNoDAIApproval(uint128 wad) public {
+        assert(wad > 0);
+        testDraw(wad);
+        wipe(wad);
     }
 
     function testTell() public {
@@ -667,75 +446,122 @@ contract TinlakeManagerUnitTest is DSTest {
         mgr.tell();
     }
 
-    function testFailTellNotLive() public {
-        // set live to false
+    function testFailCullMissingUrnOracleCull() public {
+        uint wad = 0.5 ether;
+        testDraw(wad);
+
+        (uint256 ink, uint256 art) = vat.urns(ilk, address(urn));
+
+        tell();
+        assertEq(mgr.tab(), RAY * wad);
+
+        hevm.warp(block.timestamp + 2 weeks);
+
+        // should fail because oracle.cull() is missing
+        mgr.cull();
+    }
+
+    function testCullDefault() public {
+        testCull(0.5 ether);
+    }
+
+    function testCull(uint128 wad) public {
+        if (ceiling < wad) return; // amount has to be below ceiling
+        // set safe to false, call tell
+        testDraw(wad);
+        tell();
+        hevm.warp(block.timestamp + 2 weeks);
+        cull();
+    }
+
+
+    function testFailCullGlobalSettlement() public {
+        uint wad = 100 ether;
+        testDraw(wad);
+        tell();
         cage();
-        // revoke access permissions from self
-        mgr.deny(self);
-        mgr.tell();
+        cull();
     }
 
-    function testFailTellNoAuth() public {
-        mgr.deny(self);
-        mgr.tell();
+    function testFailCullIsSafe(uint wad) public {
+        uint wad = 100 ether;
+        // set safe to false, call tell
+        testDraw(wad);
+        cull();
     }
 
-    function testJoin(uint128 wad) public {
-        // wad = 100 ether;
-        // mint collateral for test contract
-        drop.mint(self, wad);
-        //  vat.rely(mgr_);
-        // approve mgr to take collateral
-        drop.approve(mgr_, wad);
-        join(wad);
+    function testUnwindFullRepayment(uint128 wad) public {
+        if (ceiling < wad) return; // amount has to be below ceiling
+        testDraw(wad);
+        dai.transferFrom(self, seniorOperator_, wad);
+        // trigger tell condition & set safe to false
+        tell();
+        unwind(wad);
     }
 
-    function testFailJoinNotLive(uint128 art, uint128 ink, uint128 wad) public {
-        testCage(art, ink);
-        testJoin(wad);
+    function testUnwindPartialRepayment(uint128 wad) public {
+        if (ceiling < wad) return; // amount has to be below ceiling
+        testDraw(wad);
+        dai.transferFrom(self, seniorOperator_, wad);
+        // trigger tell condition & set safe to false
+        tell();
+        uint tab = mgr.tab();
+
+        uint128 repayAmount = wad/2;
+        unwind(repayAmount); // Payback half of the loan
+        assertEq(tab-repayAmount*RAY, mgr.tab());
     }
 
-    function testFailJoinNotSafe(uint128 wad) public {
-         testTell();
-         testJoin(wad);
+    function testFailUnwindGlobalSettlement(uint128 wad) public {
+        assert(wad > ceiling); // avoid overflow
+        testDraw(wad);
+        dai.transferFrom(self, seniorOperator_, wad);
+        // trigger tell condition & set safe to false
+        tell();
+        cage();
+        unwind(wad);
     }
 
-    function testFailJoinOverflow() public {
-        uint wad = uint(-1);
-        // mint collateral for test contract
-        drop.mint(self, wad);
-        // approve mgr to take collateral
-        drop.approve(mgr_, wad);
-        join(wad);
+    function testFailUnwindInsufficientDAIBalance(uint128 wad) public {
+       assert(wad > ceiling); // avoid overflow
+        testDraw(wad);
+        // trigger tell condition & set safe to false
+        tell();
+        unwind(wad);
     }
 
-    function testFailJoinCollateralAmountTooHigh(uint128 wad) public {
-        // wad = 100 ether;
-        // mint collateral for test contract
-        uint collateralBalance = sub(wad, 1);
-        drop.mint(self, collateralBalance);
-        // approve mgr to take collateral
-        drop.approve(mgr_, collateralBalance);
-        join(wad);
+    function testFailUnwindSafe(uint128 wad) public {
+        assert(wad > ceiling); // avoid overflow
+        testDraw(wad);
+        dai.transferFrom(self, seniorOperator_, wad);
+        unwind(wad);
     }
 
-    function testFailJoinNoApproval(uint128 wad) public {
-        // for 0 not approval is required
-        assert(wad > 0);
-        // wad = 100 ether;
-        // mint collateral for test contract
-        drop.mint(self, wad);
-        join(wad);
+    function testMigrate() public {
+          migrate();
     }
 
-    function testFailJoinNoVatAuth(uint128 wad) public {
-        // wad = 100 ether;
-        // mint collateral for test contract
-        drop.mint(self, wad);
-        // approve mgr to take collateral
-        drop.approve(mgr_, wad);
-        // revoke mgr auth from vat
-        vat.deny(mgr_);
-        join(wad);
+    function testFullRecover(uint128 wad) public {
+        if (ceiling < wad) return; // amount has to be below ceiling
+        testCull(wad);
+        recover(wad, 1);
+    }
+
+    function testPartialRecover(uint128 wad) public {
+        if (ceiling < wad) return; // amount has to be below ceiling
+        if (wad < 2) return;
+        testCull(wad);
+        recover(wad/2, 1);
+    }
+
+    function testFailRecoverisGlad(uint128 wad) public {
+        recover(wad, 1);
+    }
+
+    function testRecoverGlobalSettlement(uint128 wad) public {
+        if (ceiling < wad) return; // amount has to be below ceiling
+        testCull(wad);
+        cage();
+        recover(wad, 1);
     }
 }
