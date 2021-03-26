@@ -10,3 +10,6 @@
 [submodule "lib/tinlake"]
 	path = lib/tinlake
 	url = https://github.com/centrifuge/tinlake
+[submodule "lib/rwa-example"]
+	path = lib/rwa-example
+	url = https://github.com/livnev/rwa-example
