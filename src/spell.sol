@@ -47,12 +47,12 @@ contract SpellAction {
         ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
 
     address constant NS2DRP_OPERATOR           = 0x27EfE12d1bede473960859E85375FaB75F4C9ffa;
-    address constant NS2DRP_GEM                = 0xAA2d2B3F105Cb9E191DF77B48f2348F4cfD7c75D;
-    address constant MCD_JOIN_NS2DRP_A         = 0xe99C6f7EB6E4D4ca47F2588aaD6f0f1e673E4621;
-    address constant NS2DRP_A_URN              = 0xc0B8F156F1EDa2981BD6ce920F1Dceaa72B57a2e;
+    address constant NS2DRP_GEM                = 0x46b25B14C572670F01De2453B03e001BAcAFF438;
+    address constant MCD_JOIN_NS2DRP_A         = 0x56Bc1E875cD1e557B90441ce7402CA2cB88D3819;
+    address constant NS2DRP_A_URN              = 0xB1d6C9079CD81e96e1719f1c22F5Fa4285f4e031;
     address constant NS2DRP_A_INPUT_CONDUIT    = 0x27EfE12d1bede473960859E85375FaB75F4C9ffa;
     address constant NS2DRP_A_OUTPUT_CONDUIT   = 0x27EfE12d1bede473960859E85375FaB75F4C9ffa;
-    address constant MIP21_LIQUIDATION_ORACLE  = 0xB866339a929BB5a8956A66aAc513cF04f379F159;
+    address constant MIP21_LIQUIDATION_ORACLE  = 0xbB24f0c5e50EEA2f19CE996F4dcA6Ce216b58114;
 
     uint256 constant NS2DRP_THREEPOINTSIX_PERCENT_RATE = 1000000001121484774769253326;
 
@@ -143,10 +143,6 @@ contract SpellAction {
 
         // set up the urn
         RwaUrnLike(NS2DRP_A_URN).hope(NS2DRP_OPERATOR);
-
-        // set up output conduit
-        RwaOutputConduitLike(NS2DRP_A_OUTPUT_CONDUIT).hope(NS2DRP_OPERATOR);
-        // could potentially kiss some BD addresses if they are available
     }
 }
 
@@ -164,7 +160,7 @@ contract RwaSpell {
     uint256         public expiration;
     bool            public done;
 
-    string constant public description = "Kovan Spell Deploy";
+    string constant public description = "New Silver Spell Deploy";
 
     constructor() public {
         sig = abi.encodeWithSignature("execute()");

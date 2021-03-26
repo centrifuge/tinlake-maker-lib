@@ -193,9 +193,9 @@ contract BumpSpell is TestSpell {
 
 contract DssSpellTest is DSTest, DSMath {
     // populate with mainnet spell if needed
-    address constant KOVAN_SPELL = address(0xdCB87e8149F7bE368ec077b0D92C7ADAC8bB919e);
+    // address constant KOVAN_SPELL = address(0xdCB87e8149F7bE368ec077b0D92C7ADAC8bB919e);
     // this needs to be updated
-    uint256 constant SPELL_CREATED = 1614270940;
+    // uint256 constant SPELL_CREATED = 1614270940;
 
     struct CollateralValues {
         uint256 line;
@@ -339,8 +339,7 @@ contract DssSpellTest is DSTest, DSMath {
         hevm = Hevm(address(CHEAT_CODE));
         rates = new Rates();
 
-        spell = KOVAN_SPELL != address(0) ?
-            RwaSpell(KOVAN_SPELL) : new RwaSpell();
+        spell = new RwaSpell();
 
         //
         // Test for all system configuration changes
@@ -616,20 +615,6 @@ contract DssSpellTest is DSTest, DSMath {
         assertEq(sumlines, values.vat_Line);
     }
 
-    function testFailWrongDay() public {
-        vote(address(spell));
-        scheduleWaitAndCastFailDay();
-    }
-
-    function testFailTooEarly() public {
-        vote(address(spell));
-        scheduleWaitAndCastFailEarly();
-    }
-
-    function testFailTooLate() public {
-        vote(address(spell));
-        scheduleWaitAndCastFailLate();
-    }
 
     function testSpellIsCast() public {
         string memory description = new RwaSpell().description();
@@ -638,11 +623,9 @@ contract DssSpellTest is DSTest, DSMath {
         assertEq(stringToBytes32(spell.description()),
                 stringToBytes32(description));
 
-        if(address(spell) != address(KOVAN_SPELL)) {
-            assertEq(spell.expiration(), (block.timestamp + 30 days));
-        } else {
-            assertEq(spell.expiration(), (SPELL_CREATED + 30 days));
-        }
+
+        assertEq(spell.expiration(), (block.timestamp + 30 days));
+
 
         vote(address(spell));
         scheduleWaitAndCast();
@@ -654,250 +637,266 @@ contract DssSpellTest is DSTest, DSMath {
         // checkCollateralValues(afterSpell);
     }
 
-    function testChainlogValues() public {
-        vote(address(spell));
-        scheduleWaitAndCast();
-        assertTrue(spell.done());
+    // function testFailWrongDay() public {
+    //     vote(address(spell));
+    //     scheduleWaitAndCastFailDay();
+    // }
 
-        assertEq(chainlog.getAddress("RWA001"), addr.addr("RWA001"));
-        assertEq(chainlog.getAddress("MCD_JOIN_RWA001_A"), addr.addr("MCD_JOIN_RWA001_A"));
-        assertEq(chainlog.getAddress("RWA001_A_URN"), addr.addr("RWA001_A_URN"));
-        assertEq(chainlog.getAddress("RWA001_A_INPUT_CONDUIT"), addr.addr("RWA001_A_INPUT_CONDUIT"));
-        assertEq(chainlog.getAddress("RWA001_A_OUTPUT_CONDUIT"), addr.addr("RWA001_A_OUTPUT_CONDUIT"));
-        assertEq(chainlog.getAddress("MIP21_LIQUIDATION_ORACLE"), addr.addr("MIP21_LIQUIDATION_ORACLE"));
-    }
+    // function testFailTooEarly() public {
+    //     vote(address(spell));
+    //     scheduleWaitAndCastFailEarly();
+    // }
 
-    function testSpellIsCast_RWA001_INTEGRATION_BUMP() public {
-        vote(address(spell));
-        scheduleWaitAndCast();
-        assertTrue(spell.done());
+    // function testFailTooLate() public {
+    //     vote(address(spell));
+    //     scheduleWaitAndCastFailLate();
+    // }
 
-        bumpSpell = new BumpSpell();
-        vote(address(bumpSpell));
 
-        bumpSpell.schedule();
+//     function testChainlogValues() public {
+//         vote(address(spell));
+//         scheduleWaitAndCast();
+//         assertTrue(spell.done());
 
-        uint256 castTime = block.timestamp + pause.delay();
-        hevm.warp(castTime);
-        (, address pip, ,) = oracle.ilks("NS2DRP-A");
+//         assertEq(chainlog.getAddress("RWA001"), addr.addr("RWA001"));
+//         assertEq(chainlog.getAddress("MCD_JOIN_RWA001_A"), addr.addr("MCD_JOIN_RWA001_A"));
+//         assertEq(chainlog.getAddress("RWA001_A_URN"), addr.addr("RWA001_A_URN"));
+//         assertEq(chainlog.getAddress("RWA001_A_INPUT_CONDUIT"), addr.addr("RWA001_A_INPUT_CONDUIT"));
+//         assertEq(chainlog.getAddress("RWA001_A_OUTPUT_CONDUIT"), addr.addr("RWA001_A_OUTPUT_CONDUIT"));
+//         assertEq(chainlog.getAddress("MIP21_LIQUIDATION_ORACLE"), addr.addr("MIP21_LIQUIDATION_ORACLE"));
+//     }
 
-        assertEq(DSValueAbstract(pip).read(), bytes32(1060 * WAD));
-        bumpSpell.cast();
-        assertEq(DSValueAbstract(pip).read(), bytes32(1070 * WAD));
-    }
+//     function testSpellIsCast_RWA001_INTEGRATION_BUMP() public {
+//         vote(address(spell));
+//         scheduleWaitAndCast();
+//         assertTrue(spell.done());
 
-    function testSpellIsCast_RWA001_INTEGRATION_TELL() public {
-        vote(address(spell));
-        scheduleWaitAndCast();
-        assertTrue(spell.done());
+//         bumpSpell = new BumpSpell();
+//         vote(address(bumpSpell));
 
-        tellSpell = new TellSpell();
-        vote(address(tellSpell));
+//         bumpSpell.schedule();
 
-        tellSpell.schedule();
+//         uint256 castTime = block.timestamp + pause.delay();
+//         hevm.warp(castTime);
+//         (, address pip, ,) = oracle.ilks("NS2DRP-A");
 
-        uint256 castTime = block.timestamp + pause.delay();
-        hevm.warp(castTime);
-        (, , , uint48 tocPre) = oracle.ilks("NS2DRP-A");
-        assertTrue(tocPre == 0);
-        assertTrue(oracle.good("NS2DRP-A"));
-        tellSpell.cast();
-        (, , , uint48 tocPost) = oracle.ilks("NS2DRP-A");
-        assertTrue(tocPost > 0);
-        assertTrue(oracle.good("NS2DRP-A"));
-        hevm.warp(block.timestamp + 600);
-        assertTrue(!oracle.good("NS2DRP-A"));
-    }
+//         assertEq(DSValueAbstract(pip).read(), bytes32(1060 * WAD));
+//         bumpSpell.cast();
+//         assertEq(DSValueAbstract(pip).read(), bytes32(1070 * WAD));
+//     }
 
-    function testSpellIsCast_RWA001_INTEGRATION_TELL_CURE_GOOD() public {
-        vote(address(spell));
-        scheduleWaitAndCast();
-        assertTrue(spell.done());
+//     function testSpellIsCast_RWA001_INTEGRATION_TELL() public {
+//         vote(address(spell));
+//         scheduleWaitAndCast();
+//         assertTrue(spell.done());
 
-        tellSpell = new TellSpell();
-        vote(address(tellSpell));
+//         tellSpell = new TellSpell();
+//         vote(address(tellSpell));
 
-        tellSpell.schedule();
+//         tellSpell.schedule();
 
-        uint256 castTime = block.timestamp + pause.delay();
-        hevm.warp(castTime);
-        tellSpell.cast();
-        assertTrue(oracle.good(ilk));
-        hevm.warp(block.timestamp + 600);
-        assertTrue(!oracle.good(ilk));
+//         uint256 castTime = block.timestamp + pause.delay();
+//         hevm.warp(castTime);
+//         (, , , uint48 tocPre) = oracle.ilks("NS2DRP-A");
+//         assertTrue(tocPre == 0);
+//         assertTrue(oracle.good("NS2DRP-A"));
+//         tellSpell.cast();
+//         (, , , uint48 tocPost) = oracle.ilks("NS2DRP-A");
+//         assertTrue(tocPost > 0);
+//         assertTrue(oracle.good("NS2DRP-A"));
+//         hevm.warp(block.timestamp + 600);
+//         assertTrue(!oracle.good("NS2DRP-A"));
+//     }
 
-        cureSpell = new CureSpell();
-        vote(address(cureSpell));
+//     function testSpellIsCast_RWA001_INTEGRATION_TELL_CURE_GOOD() public {
+//         vote(address(spell));
+//         scheduleWaitAndCast();
+//         assertTrue(spell.done());
 
-        cureSpell.schedule();
-        castTime = block.timestamp + pause.delay();
-        hevm.warp(castTime);
-        cureSpell.cast();
-        assertTrue(oracle.good(ilk));
-        (,,, uint48 toc) = oracle.ilks(ilk);
-        assertEq(uint256(toc), 0);
-    }
+//         tellSpell = new TellSpell();
+//         vote(address(tellSpell));
 
-    function testFailSpellIsCast_RWA001_INTEGRATION_CURE() public {
-        vote(address(spell));
-        scheduleWaitAndCast();
-        assertTrue(spell.done());
+//         tellSpell.schedule();
 
-        cureSpell = new CureSpell();
-        vote(address(cureSpell));
+//         uint256 castTime = block.timestamp + pause.delay();
+//         hevm.warp(castTime);
+//         tellSpell.cast();
+//         assertTrue(oracle.good(ilk));
+//         hevm.warp(block.timestamp + 600);
+//         assertTrue(!oracle.good(ilk));
 
-        cureSpell.schedule();
-        uint256 castTime = block.timestamp + pause.delay();
-        hevm.warp(castTime);
-        cureSpell.cast();
-    }
+//         cureSpell = new CureSpell();
+//         vote(address(cureSpell));
 
-    function testSpellIsCast_RWA001_INTEGRATION_TELL_CULL() public {
-        vote(address(spell));
-        scheduleWaitAndCast();
-        assertTrue(spell.done());
-        assertTrue(oracle.good("NS2DRP-A"));
+//         cureSpell.schedule();
+//         castTime = block.timestamp + pause.delay();
+//         hevm.warp(castTime);
+//         cureSpell.cast();
+//         assertTrue(oracle.good(ilk));
+//         (,,, uint48 toc) = oracle.ilks(ilk);
+//         assertEq(uint256(toc), 0);
+//     }
 
-        tellSpell = new TellSpell();
-        vote(address(tellSpell));
+//     function testFailSpellIsCast_RWA001_INTEGRATION_CURE() public {
+//         vote(address(spell));
+//         scheduleWaitAndCast();
+//         assertTrue(spell.done());
 
-        tellSpell.schedule();
+//         cureSpell = new CureSpell();
+//         vote(address(cureSpell));
 
-        uint256 castTime = block.timestamp + pause.delay();
-        hevm.warp(castTime);
-        tellSpell.cast();
-        assertTrue(oracle.good("NS2DRP-A"));
-        hevm.warp(block.timestamp + 600);
-        assertTrue(!oracle.good("NS2DRP-A"));
+//         cureSpell.schedule();
+//         uint256 castTime = block.timestamp + pause.delay();
+//         hevm.warp(castTime);
+//         cureSpell.cast();
+//     }
 
-        cullSpell = new CullSpell();
-        vote(address(cullSpell));
+//     function testSpellIsCast_RWA001_INTEGRATION_TELL_CULL() public {
+//         vote(address(spell));
+//         scheduleWaitAndCast();
+//         assertTrue(spell.done());
+//         assertTrue(oracle.good("NS2DRP-A"));
 
-        cullSpell.schedule();
-        castTime = block.timestamp + pause.delay();
-        hevm.warp(castTime);
-        cullSpell.cast();
-        assertTrue(!oracle.good("NS2DRP-A"));
-        (, address pip,,) = oracle.ilks("NS2DRP-A");
-        assertEq(DSValueAbstract(pip).read(), bytes32(0));
-    }
+//         tellSpell = new TellSpell();
+//         vote(address(tellSpell));
 
-    function testSpellIsCast_RWA001_OPERATOR_LOCK_DRAW_CONDUITS_WIPE_FREE() public {
-        vote(address(spell));
-        scheduleWaitAndCast();
-        assertTrue(spell.done());
+//         tellSpell.schedule();
 
-        hevm.warp(now + 10 days); // Let rate be > 1
+//         uint256 castTime = block.timestamp + pause.delay();
+//         hevm.warp(castTime);
+//         tellSpell.cast();
+//         assertTrue(oracle.good("NS2DRP-A"));
+//         hevm.warp(block.timestamp + 600);
+//         assertTrue(!oracle.good("NS2DRP-A"));
 
-        hevm.store(
-            address(rwagem),
-            keccak256(abi.encode(address(this), uint256(0))),
-            bytes32(uint256(2 ether))
-        );
-        hevm.store(
-            address(rwagem),
-            keccak256(abi.encode(address(this), uint256(1))),
-            bytes32(uint256(1 ether))
-        );
-        // setting address(this) as operator
-        hevm.store(
-            address(rwaurn),
-            keccak256(abi.encode(address(this), uint256(1))),
-            bytes32(uint256(1))
-        );
-        assertEq(rwagem.totalSupply(), 1 * WAD);
-        assertEq(rwagem.balanceOf(address(this)), 1 * WAD);
-        assertEq(rwaurn.can(address(this)), 1);
+//         cullSpell = new CullSpell();
+//         vote(address(cullSpell));
 
-        rwagem.approve(address(rwaurn), 1 * WAD);
-        rwaurn.lock(1 * WAD);
-        assertEq(dai.balanceOf(address(rwaconduitout)), 0);
-        rwaurn.draw(1 * WAD);
+//         cullSpell.schedule();
+//         castTime = block.timestamp + pause.delay();
+//         hevm.warp(castTime);
+//         cullSpell.cast();
+//         assertTrue(!oracle.good("NS2DRP-A"));
+//         (, address pip,,) = oracle.ilks("NS2DRP-A");
+//         assertEq(DSValueAbstract(pip).read(), bytes32(0));
+//     }
 
-        (, uint256 rate,,,) = vat.ilks("NS2DRP-A");
+//     function testSpellIsCast_RWA001_OPERATOR_LOCK_DRAW_CONDUITS_WIPE_FREE() public {
+//         vote(address(spell));
+//         scheduleWaitAndCast();
+//         assertTrue(spell.done());
 
-        uint256 dustInVat = vat.dai(address(rwaurn));
+//         hevm.warp(now + 10 days); // Let rate be > 1
 
-        (uint256 ink, uint256 art) = vat.urns(ilk, address(rwaurn));
-        assertEq(ink, 1 * WAD);
-        assertEq(art, (1 * RAD + dustInVat) / rate);
-        assertEq(dai.balanceOf(address(rwaconduitout)), 1 * WAD);
+//         hevm.store(
+//             address(rwagem),
+//             keccak256(abi.encode(address(this), uint256(0))),
+//             bytes32(uint256(2 ether))
+//         );
+//         hevm.store(
+//             address(rwagem),
+//             keccak256(abi.encode(address(this), uint256(1))),
+//             bytes32(uint256(1 ether))
+//         );
+//         // setting address(this) as operator
+//         hevm.store(
+//             address(rwaurn),
+//             keccak256(abi.encode(address(this), uint256(1))),
+//             bytes32(uint256(1))
+//         );
+//         assertEq(rwagem.totalSupply(), 1 * WAD);
+//         assertEq(rwagem.balanceOf(address(this)), 1 * WAD);
+//         assertEq(rwaurn.can(address(this)), 1);
 
-        // wards
-        hevm.store(
-            address(rwaconduitout),
-            keccak256(abi.encode(address(this), uint256(0))),
-            bytes32(uint256(1))
-        );
+//         rwagem.approve(address(rwaurn), 1 * WAD);
+//         rwaurn.lock(1 * WAD);
+//         assertEq(dai.balanceOf(address(rwaconduitout)), 0);
+//         rwaurn.draw(1 * WAD);
 
-        // can
-        hevm.store(
-            address(rwaconduitout),
-            keccak256(abi.encode(address(this), uint256(1))),
-            bytes32(uint256(1))
-        );
+//         (, uint256 rate,,,) = vat.ilks("NS2DRP-A");
 
-        assertEq(dai.balanceOf(address(rwaconduitout)), 1 * WAD);
+//         uint256 dustInVat = vat.dai(address(rwaurn));
 
-        rwaconduitout.kiss(address(this));
-        rwaconduitout.pick(address(this));
+//         (uint256 ink, uint256 art) = vat.urns(ilk, address(rwaurn));
+//         assertEq(ink, 1 * WAD);
+//         assertEq(art, (1 * RAD + dustInVat) / rate);
+//         assertEq(dai.balanceOf(address(rwaconduitout)), 1 * WAD);
 
-        rwaconduitout.push();
+//         // wards
+//         hevm.store(
+//             address(rwaconduitout),
+//             keccak256(abi.encode(address(this), uint256(0))),
+//             bytes32(uint256(1))
+//         );
 
-        assertEq(dai.balanceOf(address(rwaconduitout)), 0);
-        assertEq(dai.balanceOf(address(this)), 1 * WAD);
+//         // can
+//         hevm.store(
+//             address(rwaconduitout),
+//             keccak256(abi.encode(address(this), uint256(1))),
+//             bytes32(uint256(1))
+//         );
 
-        hevm.warp(now + 10 days);
+//         assertEq(dai.balanceOf(address(rwaconduitout)), 1 * WAD);
 
-        (ink, art) = vat.urns(ilk, address(rwaurn));
-        assertEq(ink, 1 * WAD);
-        assertEq(art, (1 * RAD + dustInVat) / rate);
-        (ink,) = vat.urns(ilk, address(this));
-        assertEq(ink, 0);
+//         rwaconduitout.kiss(address(this));
+//         rwaconduitout.pick(address(this));
 
-        jug.drip("NS2DRP-A");
+//         rwaconduitout.push();
 
-        (, rate,,,) = vat.ilks("NS2DRP-A");
+//         assertEq(dai.balanceOf(address(rwaconduitout)), 0);
+//         assertEq(dai.balanceOf(address(this)), 1 * WAD);
 
-        uint256 daiToPay = (art * rate - dustInVat) / RAY + 1; // extra wei rounding
+//         hevm.warp(now + 10 days);
 
-        hevm.store(
-            address(dai),
-            keccak256(abi.encode(address(this), uint256(2))),
-            bytes32(uint256(daiToPay))
-        ); // Forcing extra DAI balance to pay accumulated fee
+//         (ink, art) = vat.urns(ilk, address(rwaurn));
+//         assertEq(ink, 1 * WAD);
+//         assertEq(art, (1 * RAD + dustInVat) / rate);
+//         (ink,) = vat.urns(ilk, address(this));
+//         assertEq(ink, 0);
 
-        assertEq(dai.balanceOf(address(rwaconduitin)), 0);
-        dai.transfer(address(rwaconduitin), daiToPay);
-        assertEq(dai.balanceOf(address(rwaconduitin)), daiToPay);
-        rwaconduitin.push();
+//         jug.drip("NS2DRP-A");
 
-        assertEq(dai.balanceOf(address(rwaurn)), daiToPay);
-        assertEq(dai.balanceOf(address(rwaconduitin)), 0);
+//         (, rate,,,) = vat.ilks("NS2DRP-A");
 
-        rwaurn.wipe(daiToPay);
-        rwaurn.free(1 * WAD);
-        (ink, art) = vat.urns(ilk, address(rwaurn));
-        assertEq(ink, 0);
-        assertEq(art, 0);
-        (ink,) = vat.urns(ilk, address(this));
-        assertEq(ink, 0);
-    }
+//         uint256 daiToPay = (art * rate - dustInVat) / RAY + 1; // extra wei rounding
 
-    function testSpellIsCast_RWA001_END() public {
-        vote(address(spell));
-        scheduleWaitAndCast();
-        assertTrue(spell.done());
+//         hevm.store(
+//             address(dai),
+//             keccak256(abi.encode(address(this), uint256(2))),
+//             bytes32(uint256(daiToPay))
+//         ); // Forcing extra DAI balance to pay accumulated fee
 
-        endSpell = new EndSpell();
-        vote(address(endSpell));
+//         assertEq(dai.balanceOf(address(rwaconduitin)), 0);
+//         dai.transfer(address(rwaconduitin), daiToPay);
+//         assertEq(dai.balanceOf(address(rwaconduitin)), daiToPay);
+//         rwaconduitin.push();
 
-        endSpell.schedule();
+//         assertEq(dai.balanceOf(address(rwaurn)), daiToPay);
+//         assertEq(dai.balanceOf(address(rwaconduitin)), 0);
 
-        uint256 castTime = block.timestamp + pause.delay();
-        hevm.warp(castTime);
-        endSpell.cast();
+//         rwaurn.wipe(daiToPay);
+//         rwaurn.free(1 * WAD);
+//         (ink, art) = vat.urns(ilk, address(rwaurn));
+//         assertEq(ink, 0);
+//         assertEq(art, 0);
+//         (ink,) = vat.urns(ilk, address(this));
+//         assertEq(ink, 0);
+//     }
 
-        // TODO: finish
-    }
-}
+//     function testSpellIsCast_RWA001_END() public {
+//         vote(address(spell));
+//         scheduleWaitAndCast();
+//         assertTrue(spell.done());
+
+//         endSpell = new EndSpell();
+//         vote(address(endSpell));
+
+//         endSpell.schedule();
+
+//         uint256 castTime = block.timestamp + pause.delay();
+//         hevm.warp(castTime);
+//         endSpell.cast();
+
+//         // TODO: finish
+//     }
+ }
