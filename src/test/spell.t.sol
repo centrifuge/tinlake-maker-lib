@@ -275,7 +275,7 @@ contract DssSpellTest is DSTest, DSMath {
     address    makerDeployer06 = 0xda0fab060e6cc7b1C0AA105d29Bd50D71f036711;
 
     // Tinlake
-    TinlakeManagerLike mgr = TinlakeManagerLike(0x65242F75e6cCBF973b15d483dD5F555d13955A1e);
+    TinlakeManagerLike mgr = TinlakeManagerLike(0x27EfE12d1bede473960859E85375FaB75F4C9ffa);
     address mgr_ = address(mgr);
 
     RwaSpell spell;
