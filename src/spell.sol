@@ -52,7 +52,7 @@ contract SpellAction {
     address constant NS2DRP_A_URN              = 0xB1d6C9079CD81e96e1719f1c22F5Fa4285f4e031;
     address constant NS2DRP_A_INPUT_CONDUIT    = 0x27EfE12d1bede473960859E85375FaB75F4C9ffa;
     address constant NS2DRP_A_OUTPUT_CONDUIT   = 0x27EfE12d1bede473960859E85375FaB75F4C9ffa;
-    address constant MIP21_LIQUIDATION_ORACLE  = 0xbB24f0c5e50EEA2f19CE996F4dcA6Ce216b58114;
+    address constant NS2DRP_LIQUIDATION_ORACLE  = 0xbB24f0c5e50EEA2f19CE996F4dcA6Ce216b58114;
 
     uint256 constant NS2DRP_THREEPOINTSIX_PERCENT_RATE = 1000000001121484774769253326;
 
@@ -87,7 +87,7 @@ contract SpellAction {
         // add RWA-001 contract to the changelog
         CHANGELOG.setAddress("NS2DRP", NS2DRP_GEM);
         CHANGELOG.setAddress("MCD_JOIN_NS2DRP_A", MCD_JOIN_NS2DRP_A);
-        CHANGELOG.setAddress("MIP21_LIQUIDATION_ORACLE", MIP21_LIQUIDATION_ORACLE);
+        CHANGELOG.setAddress("NS2DRP_LIQUIDATION_ORACLE", NS2DRP_LIQUIDATION_ORACLE);
         CHANGELOG.setAddress("NS2DRP_A_URN", NS2DRP_A_URN);
         CHANGELOG.setAddress("NS2DRP_A_INPUT_CONDUIT", NS2DRP_A_INPUT_CONDUIT);
         CHANGELOG.setAddress("NS2DRP_A_OUTPUT_CONDUIT", NS2DRP_A_OUTPUT_CONDUIT);
@@ -102,10 +102,10 @@ contract SpellAction {
         // init the RwaLiquidationOracle
         // doc: "doc"
         // tau: 5 minutes
-        RwaLiquidationLike(MIP21_LIQUIDATION_ORACLE).init(
+        RwaLiquidationLike(NS2DRP_LIQUIDATION_ORACLE).init(
             ilk, NS2DRP_A_INITIAL_PRICE, DOC, 300
         );
-        (,address pip,,) = RwaLiquidationLike(MIP21_LIQUIDATION_ORACLE).ilks(ilk);
+        (,address pip,,) = RwaLiquidationLike(NS2DRP_LIQUIDATION_ORACLE).ilks(ilk);
         CHANGELOG.setAddress("PIP_NS2DRP", pip);
 
         // Set price feed for NS2DRP
@@ -120,7 +120,7 @@ contract SpellAction {
         VatAbstract(MCD_VAT).rely(MCD_JOIN_NS2DRP_A);
 
         // Allow RwaLiquidationOracle to modify Vat registry
-        VatAbstract(MCD_VAT).rely(MIP21_LIQUIDATION_ORACLE);
+        VatAbstract(MCD_VAT).rely(NS2DRP_LIQUIDATION_ORACLE);
 
         // 5 Million debt ceiling
         VatAbstract(MCD_VAT).file(ilk, "line", NS2DRP_A_INITIAL_DC);

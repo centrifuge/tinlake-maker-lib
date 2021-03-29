@@ -61,6 +61,11 @@ interface RwaLiquidationLike {
     function good(bytes32) external view returns (bool);
 }
 
+interface TinlakeManagerLike {
+    function wards(address) external returns(uint);
+    function file(bytes32 what, address data) external;
+}
+
 contract EndSpellAction {
     ChainlogAbstract constant CHANGELOG =
         ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
@@ -75,6 +80,7 @@ contract TestSpell {
         ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
     DSPauseAbstract public pause =
         DSPauseAbstract(CHANGELOG.getAddress("MCD_PAUSE"));
+
     address         public action;
     bytes32         public tag;
     uint256         public eta;
@@ -121,7 +127,7 @@ contract CullSpellAction {
     function execute() public {
         RwaLiquidationLike(
             CHANGELOG.getAddress("MIP21_LIQUIDATION_ORACLE")
-        ).cull(ilk, CHANGELOG.getAddress("RWA001_A_URN"));
+        ).cull(ilk, CHANGELOG.getAddress("NS2DRP_A_URN"));
     }
 }
 
@@ -259,14 +265,18 @@ contract DssSpellTest is DSTest, DSMath {
     ChainlogAbstract          chainlog = ChainlogAbstract(    addr.addr("CHANGELOG"));
 
     bytes32 constant ilk               = "NS2DRP-A";
-    DSTokenAbstract             rwagem = DSTokenAbstract(     addr.addr("RWA001"));
-    GemJoinAbstract            rwajoin = GemJoinAbstract(     addr.addr("MCD_JOIN_RWA001_A"));
-    RwaLiquidationLike          oracle = RwaLiquidationLike(  addr.addr("MIP21_LIQUIDATION_ORACLE"));
-    RwaUrnLike                  rwaurn = RwaUrnLike(          addr.addr("RWA001_A_URN"));
-    RwaInputConduitLike   rwaconduitin = RwaInputConduitLike( addr.addr("RWA001_A_INPUT_CONDUIT"));
-    RwaOutputConduitLike rwaconduitout = RwaOutputConduitLike(addr.addr("RWA001_A_OUTPUT_CONDUIT"));
+    DSTokenAbstract             rwagem = DSTokenAbstract(     addr.addr("NS2DRP"));
+    GemJoinAbstract            rwajoin = GemJoinAbstract(     addr.addr("MCD_JOIN_NS2DRP_A"));
+    RwaLiquidationLike          oracle = RwaLiquidationLike(  addr.addr("NS2DRP_LIQUIDATION_ORACLE"));
+    RwaUrnLike                  rwaurn = RwaUrnLike(          addr.addr("NS2DRP_A_URN"));
+    RwaInputConduitLike   rwaconduitin = RwaInputConduitLike( addr.addr("NS2DRP_A_INPUT_CONDUIT"));
+    RwaOutputConduitLike rwaconduitout = RwaOutputConduitLike(addr.addr("NS2DRP_A_OUTPUT_CONDUIT"));
 
     address    makerDeployer06 = 0xda0fab060e6cc7b1C0AA105d29Bd50D71f036711;
+
+    // Tinlake
+    TinlakeManagerLike mgr = TinlakeManagerLike(0x65242F75e6cCBF973b15d483dD5F555d13955A1e);
+    address mgr_ = address(mgr);
 
     RwaSpell spell;
     BumpSpell bumpSpell;
@@ -290,6 +300,8 @@ contract DssSpellTest is DSTest, DSMath {
     event Debug(uint256 index, uint256 val);
     event Debug(uint256 index, address addr);
     event Debug(uint256 index, bytes32 what);
+
+    address self;
 
     // not provided in DSMath
     function rpow(
@@ -336,10 +348,19 @@ contract DssSpellTest is DSTest, DSMath {
     }
 
     function setUp() public {
+        self = address(this);
         hevm = Hevm(address(CHEAT_CODE));
         rates = new Rates();
 
         spell = new RwaSpell();
+
+        // set this contract as ward on mgr
+        hevm.store(mgr_, keccak256(abi.encode(address(this), uint(0))), bytes32(uint(1)));
+        assertEq(mgr.wards(self), 1);
+        // setup manager dependencies
+        mgr.file("urn", address(rwaurn));
+        mgr.file("liq", address(oracle));
+        mgr.file("owner", self);
 
         //
         // Test for all system configuration changes
@@ -615,14 +636,12 @@ contract DssSpellTest is DSTest, DSMath {
         assertEq(sumlines, values.vat_Line);
     }
 
-
     function testSpellIsCast() public {
         string memory description = new RwaSpell().description();
         assertTrue(bytes(description).length > 0);
         // DS-Test can't handle strings directly, so cast to a bytes32.
         assertEq(stringToBytes32(spell.description()),
                 stringToBytes32(description));
-
 
         assertEq(spell.expiration(), (block.timestamp + 30 days));
 
@@ -658,15 +677,15 @@ contract DssSpellTest is DSTest, DSMath {
 //         scheduleWaitAndCast();
 //         assertTrue(spell.done());
 
-//         assertEq(chainlog.getAddress("RWA001"), addr.addr("RWA001"));
-//         assertEq(chainlog.getAddress("MCD_JOIN_RWA001_A"), addr.addr("MCD_JOIN_RWA001_A"));
-//         assertEq(chainlog.getAddress("RWA001_A_URN"), addr.addr("RWA001_A_URN"));
-//         assertEq(chainlog.getAddress("RWA001_A_INPUT_CONDUIT"), addr.addr("RWA001_A_INPUT_CONDUIT"));
-//         assertEq(chainlog.getAddress("RWA001_A_OUTPUT_CONDUIT"), addr.addr("RWA001_A_OUTPUT_CONDUIT"));
+//         assertEq(chainlog.getAddress("NS2DRP"), addr.addr("NS2DRP"));
+//         assertEq(chainlog.getAddress("MCD_JOIN_NS2DRP_A"), addr.addr("MCD_JOIN_NS2DRP_A"));
+//         assertEq(chainlog.getAddress("NS2DRP_A_URN"), addr.addr("NS2DRP_A_URN"));
+//         assertEq(chainlog.getAddress("NS2DRP_A_INPUT_CONDUIT"), addr.addr("NS2DRP_A_INPUT_CONDUIT"));
+//         assertEq(chainlog.getAddress("NS2DRP_A_OUTPUT_CONDUIT"), addr.addr("NS2DRP_A_OUTPUT_CONDUIT"));
 //         assertEq(chainlog.getAddress("MIP21_LIQUIDATION_ORACLE"), addr.addr("MIP21_LIQUIDATION_ORACLE"));
 //     }
 
-//     function testSpellIsCast_RWA001_INTEGRATION_BUMP() public {
+//     function testSpellIsCast_NS2DRP_INTEGRATION_BUMP() public {
 //         vote(address(spell));
 //         scheduleWaitAndCast();
 //         assertTrue(spell.done());
@@ -685,7 +704,7 @@ contract DssSpellTest is DSTest, DSMath {
 //         assertEq(DSValueAbstract(pip).read(), bytes32(1070 * WAD));
 //     }
 
-//     function testSpellIsCast_RWA001_INTEGRATION_TELL() public {
+//     function testSpellIsCast_NS2DRP_INTEGRATION_TELL() public {
 //         vote(address(spell));
 //         scheduleWaitAndCast();
 //         assertTrue(spell.done());
@@ -708,7 +727,7 @@ contract DssSpellTest is DSTest, DSMath {
 //         assertTrue(!oracle.good("NS2DRP-A"));
 //     }
 
-//     function testSpellIsCast_RWA001_INTEGRATION_TELL_CURE_GOOD() public {
+//     function testSpellIsCast_NS2DRP_INTEGRATION_TELL_CURE_GOOD() public {
 //         vote(address(spell));
 //         scheduleWaitAndCast();
 //         assertTrue(spell.done());
@@ -737,7 +756,7 @@ contract DssSpellTest is DSTest, DSMath {
 //         assertEq(uint256(toc), 0);
 //     }
 
-//     function testFailSpellIsCast_RWA001_INTEGRATION_CURE() public {
+//     function testFailSpellIsCast_NS2DRP_INTEGRATION_CURE() public {
 //         vote(address(spell));
 //         scheduleWaitAndCast();
 //         assertTrue(spell.done());
@@ -751,7 +770,7 @@ contract DssSpellTest is DSTest, DSMath {
 //         cureSpell.cast();
 //     }
 
-//     function testSpellIsCast_RWA001_INTEGRATION_TELL_CULL() public {
+//     function testSpellIsCast_NS2DRP_INTEGRATION_TELL_CULL() public {
 //         vote(address(spell));
 //         scheduleWaitAndCast();
 //         assertTrue(spell.done());
@@ -781,7 +800,7 @@ contract DssSpellTest is DSTest, DSMath {
 //         assertEq(DSValueAbstract(pip).read(), bytes32(0));
 //     }
 
-//     function testSpellIsCast_RWA001_OPERATOR_LOCK_DRAW_CONDUITS_WIPE_FREE() public {
+//     function testSpellIsCast_NS2DRP_OPERATOR_LOCK_DRAW_CONDUITS_WIPE_FREE() public {
 //         vote(address(spell));
 //         scheduleWaitAndCast();
 //         assertTrue(spell.done());
@@ -883,7 +902,7 @@ contract DssSpellTest is DSTest, DSMath {
 //         assertEq(ink, 0);
 //     }
 
-//     function testSpellIsCast_RWA001_END() public {
+//     function testSpellIsCast_NS2DRP_END() public {
 //         vote(address(spell));
 //         scheduleWaitAndCast();
 //         assertTrue(spell.done());
