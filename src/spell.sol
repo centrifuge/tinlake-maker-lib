@@ -7,6 +7,7 @@ import "dss-interfaces/dss/SpotAbstract.sol";
 import "dss-interfaces/dss/GemJoinAbstract.sol";
 import "dss-interfaces/dapp/DSTokenAbstract.sol";
 import "dss-interfaces/dss/ChainlogAbstract.sol";
+import "ds-test/test.sol";
 
 interface RwaLiquidationLike {
     function wards(address) external returns (uint256);
@@ -38,7 +39,7 @@ interface RwaUrnLike {
     function hope(address) external;
 }
 
-contract SpellAction {
+contract SpellAction is DSTest {
     // KOVAN ADDRESSES
     // The contracts in this list should correspond to MCD core contracts, verify
     // against the current release list at:
@@ -65,14 +66,13 @@ contract SpellAction {
     uint256 constant public RAD      = 10 ** 45;
 
     uint256 constant NS2DRP_A_INITIAL_DC    = 5 * MILLION * RAD; 
-    uint256 constant NS2DRP_A_INITIAL_PRICE = 1060 * WAD; // value ???
+    uint256 constant NS2DRP_A_INITIAL_PRICE = 5180000 * WAD; // 5180000
 
     // MIP13c3-SP4 Declaration of Intent & Commercial Points -
     // Off-Chain Asset Backed Lender to onboard Real World Assets
     // as Collateral for a DAI loan
-    //
-    // https://ipfs.io/ipfs/QmdmAUTU3sd9VkdfTZNQM6krc9jsKgF2pz7W1qvvfJo1xk
-    string constant DOC = "QmdmAUTU3sd9VkdfTZNQM6krc9jsKgF2pz7W1qvvfJo1xk";
+    // https://ipfs.io/ipfs/QmSwZzhzFgsbduBxR4hqCavDWPjvAHbNiqarj1fbTwpevR
+    string constant DOC = "QmSwZzhzFgsbduBxR4hqCavDWPjvAHbNiqarj1fbTwpevR";
 
     function execute() external {
         address MCD_VAT  = ChainlogAbstract(CHANGELOG).getAddress("MCD_VAT");
@@ -83,8 +83,8 @@ contract SpellAction {
 
         // Set ilk bytes32 variable
         bytes32 ilk = "NS2DRP-A";
-
-        // add RWA-001 contract to the changelog
+        
+        // add NS2DRP contract to the changelog
         CHANGELOG.setAddress("NS2DRP", NS2DRP_GEM);
         CHANGELOG.setAddress("MCD_JOIN_NS2DRP_A", MCD_JOIN_NS2DRP_A);
         CHANGELOG.setAddress("NS2DRP_LIQUIDATION_ORACLE", NS2DRP_LIQUIDATION_ORACLE);
@@ -111,12 +111,12 @@ contract SpellAction {
         // Set price feed for NS2DRP
         SpotAbstract(MCD_SPOT).file(ilk, "pip", pip);
 
-        // Init RWA-001 in Vat
+        // Init NS2DRP in Vat
         VatAbstract(MCD_VAT).init(ilk);
-        // Init RWA-001 in Jug
+        // Init NS2DRP in Jug
         JugAbstract(MCD_JUG).init(ilk);
 
-        // Allow RWA-001 Join to modify Vat registry
+        // Allow NS2DRP Join to modify Vat registry
         VatAbstract(MCD_VAT).rely(MCD_JOIN_NS2DRP_A);
 
         // Allow RwaLiquidationOracle to modify Vat registry
@@ -124,6 +124,8 @@ contract SpellAction {
 
         // 5 Million debt ceiling
         VatAbstract(MCD_VAT).file(ilk, "line", NS2DRP_A_INITIAL_DC);
+        emit log_named_uint("initial", VatAbstract(MCD_VAT).Line());
+        emit log_named_uint("filed", VatAbstract(MCD_VAT).Line() + NS2DRP_A_INITIAL_DC);
         VatAbstract(MCD_VAT).file("Line", VatAbstract(MCD_VAT).Line() + NS2DRP_A_INITIAL_DC);
 
         // No dust
@@ -146,7 +148,7 @@ contract SpellAction {
     }
 }
 
-contract RwaSpell {
+contract RwaSpell is DSTest {
 
     ChainlogAbstract constant CHANGELOG =
         ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
@@ -170,6 +172,7 @@ contract RwaSpell {
         assembly { _tag := extcodehash(_action) }
         tag = _tag;
         expiration = block.timestamp + 30 days;
+        emit log_named_uint("exp", expiration);
     }
 
     function schedule() public {
@@ -182,6 +185,8 @@ contract RwaSpell {
     function cast() public {
         require(!done, "spell-already-cast");
         done = true;
+        emit log_named_uint("time", block.timestamp);
+        emit log_named_uint("eta", eta);
         pause.exec(action, tag, sig, eta);
     }
 }
