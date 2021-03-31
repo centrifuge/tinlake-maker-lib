@@ -186,7 +186,7 @@ contract BumpSpellAction {
     function execute() public {
         RwaLiquidationLike(
             CHANGELOG.getAddress("NS2DRP_LIQUIDATION_ORACLE")
-        ).bump(ilk, 5200000 * WAD);
+        ).bump(ilk, 5466480 * WAD);
     }
 }
 
@@ -387,8 +387,8 @@ contract DssSpellTestBase is DSTest, DSMath {
             line:         5 * MILLION,     // In whole Dai units // 50 million
             dust:         0,               // In whole Dai units
             pct:          360,             // In basis points
-            chop:         1300,            // In basis points
-            dunk:         50 * THOUSAND,   // In whole Dai units
+            chop:         0,               // In basis points     
+            dunk:         0,               // In whole Dai units
             mat:          10500,           // In basis points // 105%
             beg:          300,             // In basis points
             ttl:          6 hours,         // In seconds
@@ -590,41 +590,16 @@ contract DssSpellTestBase is DSTest, DSMath {
         assertEq(rwajoin.wards(address(pauseProxy)), 1); // Check pause_proxy ward
         }
     
-        // values not set in cat
-        // {
-        // (, uint256 chop, uint256 dunk) = cat.ilks(ilk);
-        // // Convert BP to system expected value
-        // uint256 normalizedTestChop = (values.collaterals[ilk].chop * 10**14) + WAD;
-        // emit log_named_uint("chop", chop);
-        // emit log_named_uint("dunk", dunk);
-        // emit log_named_uint("normalizedTestChop", normalizedTestChop);        
-        // assertEq(chop, normalizedTestChop);
-        // // make sure chop is less than 100%
-        // assertTrue(chop >= WAD && chop < 2 * WAD);   // penalty gt eq 0% and lt 100%
-        // // Convert whole Dai units to expected RAD
-        // uint256 normalizedTestDunk = values.collaterals[ilk].dunk * RAD;
-        // assertEq(dunk, normalizedTestDunk);
-        // // put back in after LIQ-1.2
-        // assertTrue(dunk >= RAD && dunk < MILLION * RAD);
-        // } https://tinlake.centrifuge.io/pool/0x53b2d22d07E069a3b132BfeaaD275b10273d381E/new-silver-2/assets/asset?assetId=7
+        {
+        (, uint256 chop, uint256 dunk) = cat.ilks(ilk);
+         assertEq(chop, values.collaterals[ilk].chop);
+         assertEq(dunk, values.collaterals[ilk].dunk);
+        } 
         
-        // flipper address not set in cat
-        // {
-        // (address flipper,,) = cat.ilks(ilk);
-        // emit log_named_address("address", flipper);
-        // FlipAbstract flip = FlipAbstract(flipper);
-        // // Convert BP to system expected value
-        // uint256 normalizedTestBeg = (values.collaterals[ilk].beg + 10000)  * 10**14;
-        // assertEq(uint256(flip.beg()), normalizedTestBeg);
-        // assertTrue(flip.beg() >= WAD && flip.beg() < 105 * WAD / 100);  // gt eq 0% and lt 5%
-        // assertEq(uint256(flip.ttl()), values.collaterals[ilk].ttl);
-        // assertTrue(flip.ttl() >= 600 && flip.ttl() < 10 hours);         // gt eq 10 minutes and lt 10 hours
-        // assertEq(uint256(flip.tau()), values.collaterals[ilk].tau);
-        // assertTrue(flip.tau() >= 600 && flip.tau() <= 3 days);          // gt eq 10 minutes and lt eq 3 days
-        // assertEq(flip.wards(address(cat)), values.collaterals[ilk_].liquidations);  // liquidations == 1 => on
-        // assertEq(flip.wards(address(makerDeployer06)), 0); // Check deployer denied
-        // assertEq(flip.wards(address(pauseProxy)), 1); // Check pause_proxy ward
-        // }
+        {
+        (address flipper,,) = cat.ilks(ilk);
+        assertEq(flipper, address(0));
+        }
     }
 
     function executeSpell() public {
