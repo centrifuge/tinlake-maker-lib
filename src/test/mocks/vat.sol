@@ -67,17 +67,17 @@ contract VatMock is Mock, Auth {
         // set values check calls
     }
 
-    function live() external returns (uint) {
+    function live() external view returns (uint) {
         return values_uint["live"];
     }
 
-    function gem(bytes32 ilk, address usr) external returns(uint) {
+    function gem(bytes32 ilk, address usr) external view returns(uint) {
        return values_uint["gem"];
     }
 
     // unit test helpers
-    function setLive(uint live) external {
-        values_uint["live"] = live;
+    function setLive(uint live_) external {
+        values_uint["live"] = live_;
     }
 
     function setGem(uint wad) external {

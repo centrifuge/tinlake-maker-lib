@@ -46,14 +46,13 @@ contract SpellAction {
     ChainlogAbstract constant CHANGELOG =
         ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
 
-    address constant NS2DRP_OPERATOR           = 0x27EfE12d1bede473960859E85375FaB75F4C9ffa;
-    address constant NS2DRP_GEM                = 0x46b25B14C572670F01De2453B03e001BAcAFF438;
-    address constant MCD_JOIN_NS2DRP_A         = 0x56Bc1E875cD1e557B90441ce7402CA2cB88D3819;
-    address constant NS2DRP_A_URN              = 0xB1d6C9079CD81e96e1719f1c22F5Fa4285f4e031;
-    address constant NS2DRP_A_INPUT_CONDUIT    = 0x27EfE12d1bede473960859E85375FaB75F4C9ffa;
-    address constant NS2DRP_A_OUTPUT_CONDUIT   = 0x27EfE12d1bede473960859E85375FaB75F4C9ffa;
+    address constant NS2DRP_OPERATOR           = 0x8905C7066807793bf9c7cd1d236DEF0eE2692B9a;
+    address constant NS2DRP_GEM                = 0x1C3765c94aF9b7eB3fdEC69Eddb7Ddf27f2BcFf4;
+    address constant MCD_JOIN_NS2DRP_A         = 0x4B8C10da2B70dE45f7Ea106A961F2Fb79f5bC2bE;
+    address constant NS2DRP_A_URN              = 0xdFb4E887D89Ac14b0337C9dC05d8f5e492B9847C;
+    address constant NS2DRP_A_INPUT_CONDUIT    = 0x8905C7066807793bf9c7cd1d236DEF0eE2692B9a;
+    address constant NS2DRP_A_OUTPUT_CONDUIT   = 0x8905C7066807793bf9c7cd1d236DEF0eE2692B9a;
     uint256 constant NS2DRP_THREEPOINTSIX_PERCENT_RATE = 1000000001121484774769253326;
-
 
     // precision
     uint256 constant public THOUSAND = 10 ** 3;

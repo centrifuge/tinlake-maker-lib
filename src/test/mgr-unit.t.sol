@@ -92,7 +92,6 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
 
     // -- testing --
     Hevm constant hevm = Hevm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
-    uint256 rate;
     uint256 ceiling = 400 ether;
     string doc = "Please sign on the dotted line.";
 
@@ -166,9 +165,8 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
 
         mgr = new TinlakeManager(dai_,
                                  daiJoin_,
-                                 drop_, // DROP token
-                                 seniorOperator_, // senior operator
-                                 address(this), // senior tranche
+                                 drop_,
+                                 seniorOperator_,
                                  seniorTranche_,
                                  end_,
                                  address(vat),
@@ -247,7 +245,7 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
 
         // check DAI were transferred & burned
         assertEq(dai.balanceOf(self), sub(selfBalanceDAI, wad));
-       // assertEq(dai.totalSupply(), sub(totalSupplyDAI, wad));
+        assertEq(dai.totalSupply(), sub(totalSupplyDAI, wad));
     }
 
     function migrate() public {
@@ -450,8 +448,6 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
         uint wad = 0.5 ether;
         testDraw(wad);
 
-        (uint256 ink, uint256 art) = vat.urns(ilk, address(urn));
-
         tell();
         assertEq(mgr.tab(), RAY * wad);
 
@@ -484,7 +480,6 @@ contract TinlakeManagerUnitTest is DSTest, DSMath {
     }
 
     function testFailCullIsSafe(uint wad) public {
-        uint wad = 100 ether;
         // set safe to false, call tell
         testDraw(wad);
         cull();

@@ -126,9 +126,8 @@ contract TinlakeManager {
 
     constructor(address dai_,   address daiJoin_,
                 address drop_,  address pool_,
-                address owner_, address tranche_,
-                address end_,   address vat_,
-                address vow_
+                address tranche_, address end_,
+                address vat_, address vow_
                 ) public {
         dai = GemLike(dai_);
         daiJoin = JoinLike(daiJoin_);
@@ -215,7 +214,7 @@ contract TinlakeManager {
 
     // Take DAI from the urn in case there is any in the Urn
     // can be dealt with through migrate() after ES
-    function quit(uint256 wad) public auth {
+    function quit() public auth {
         urn.quit();
     }
 
@@ -311,7 +310,7 @@ contract TinlakeManager {
 
     function recover(uint256 endEpoch) public {
         require(!glad, "TinlakeMgr/not-written-off");
- 
+
         (uint256 recovered, , ,) = pool.disburse(endEpoch);
         uint256 payBack;
         if (end.debt() == 0) {
