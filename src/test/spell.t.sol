@@ -197,7 +197,7 @@ contract BumpSpell is TestSpell {
     }
 }
 
-contract DssSpellTest is DSTest, DSMath {
+contract DssSpellTestBase is DSTest, DSMath {
     // populate with mainnet spell if needed
     // address constant KOVAN_SPELL = address(0xdCB87e8149F7bE368ec077b0D92C7ADAC8bB919e);
     // this needs to be updated
@@ -240,7 +240,7 @@ contract DssSpellTest is DSTest, DSMath {
 
     // KOVAN ADDRESSES
     DSPauseAbstract              pause = DSPauseAbstract(     addr.addr("MCD_PAUSE"));
-    address                      pauseProxy =                      addr.addr("MCD_PAUSE_PROXY");
+    address                 pauseProxy =                      addr.addr("MCD_PAUSE_PROXY");
 
     DSChiefAbstract              chief = DSChiefAbstract(     addr.addr("MCD_ADM"));
     VatAbstract                    vat = VatAbstract(         addr.addr("MCD_VAT"));
@@ -423,7 +423,7 @@ contract DssSpellTest is DSTest, DSMath {
         scheduleWaitAndCast();
     }
 
-    function vote(address _spell) private {
+    function vote(address _spell) public {
         if (chief.hat() !=_spell) {
             hevm.store(
                 address(gov),
@@ -483,7 +483,6 @@ contract DssSpellTest is DSTest, DSMath {
             pot.dsr() >= RAY && pot.dsr() < 1000000021979553151239153027
         );
         assertTrue(diffCalc(expectedRate(values.pot_dsr), yearlyYield(expectedDSRRate)) <= TOLERANCE);
-
 
         {
         // Line values in RAD
@@ -630,6 +629,23 @@ contract DssSpellTest is DSTest, DSMath {
         assertEq(sumlines, values.vat_Line);
     }
 
+    function executeSpell() public {
+        string memory description = new RwaSpell().description();
+        assertTrue(bytes(description).length > 0);
+        // DS-Test can't handle strings directly, so cast to a bytes32.
+        assertEq(stringToBytes32(spell.description()),
+            stringToBytes32(description));
+
+        assertEq(spell.expiration(), (block.timestamp + 30 days));
+
+
+        vote(address(spell));
+        scheduleWaitAndCast();
+        assertTrue(spell.done());
+    }
+}
+
+contract DssSpellTest is DssSpellTestBase {
     function testSpellIsCast() public {
         string memory description = new RwaSpell().description();
         assertTrue(bytes(description).length > 0);
@@ -643,7 +659,7 @@ contract DssSpellTest is DSTest, DSMath {
         vote(address(spell));
         scheduleWaitAndCast();
         assertTrue(spell.done());
-        
+
         checkSystemValues(afterSpell);
         // checkCollateralValues(afterSpell);
     }
