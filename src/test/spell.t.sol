@@ -126,7 +126,7 @@ contract CullSpellAction {
 
     function execute() public {
         RwaLiquidationLike(
-            CHANGELOG.getAddress("NS2DRP_LIQUIDATION_ORACLE")
+            CHANGELOG.getAddress("MIP21_LIQUIDATION_ORACLE")
         ).cull(ilk, CHANGELOG.getAddress("NS2DRP_A_URN"));
     }
 }
@@ -145,7 +145,7 @@ contract CureSpellAction {
 
     function execute() public {
         RwaLiquidationLike(
-            CHANGELOG.getAddress("NS2DRP_LIQUIDATION_ORACLE")
+            CHANGELOG.getAddress("MIP21_LIQUIDATION_ORACLE")
         ).cure(ilk);
     }
 }
@@ -165,7 +165,7 @@ contract TellSpellAction {
     function execute() public {
         VatAbstract(CHANGELOG.getAddress("MCD_VAT")).file(ilk, "line", 0);
         RwaLiquidationLike(
-            CHANGELOG.getAddress("NS2DRP_LIQUIDATION_ORACLE")
+            CHANGELOG.getAddress("MIP21_LIQUIDATION_ORACLE")
         ).tell(ilk);
     }
 }
@@ -185,7 +185,7 @@ contract BumpSpellAction {
 
     function execute() public {
         RwaLiquidationLike(
-            CHANGELOG.getAddress("NS2DRP_LIQUIDATION_ORACLE")
+            CHANGELOG.getAddress("MIP21_LIQUIDATION_ORACLE")
         ).bump(ilk, 5466480 * WAD);
     }
 }
@@ -267,7 +267,7 @@ contract DssSpellTestBase is DSTest, DSMath {
     bytes32 constant ilk               = "NS2DRP-A";
     DSTokenAbstract             rwagem = DSTokenAbstract(     addr.addr("NS2DRP"));
     GemJoinAbstract            rwajoin = GemJoinAbstract(     addr.addr("MCD_JOIN_NS2DRP_A"));
-    RwaLiquidationLike          oracle = RwaLiquidationLike(  addr.addr("NS2DRP_LIQUIDATION_ORACLE"));
+    RwaLiquidationLike          oracle = RwaLiquidationLike(  addr.addr("MIP21_LIQUIDATION_ORACLE"));
     RwaUrnLike                  rwaurn = RwaUrnLike(          addr.addr("NS2DRP_A_URN"));
     RwaInputConduitLike   rwaconduitin = RwaInputConduitLike( addr.addr("NS2DRP_A_INPUT_CONDUIT"));
     RwaOutputConduitLike rwaconduitout = RwaOutputConduitLike(addr.addr("NS2DRP_A_OUTPUT_CONDUIT"));
@@ -389,7 +389,7 @@ contract DssSpellTestBase is DSTest, DSMath {
             pct:          360,             // In basis points
             chop:         0,               // In basis points     
             dunk:         0,               // In whole Dai units
-            mat:          10500,           // In basis points // 105%
+            mat:          10000,           // In basis points // 105%
             beg:          300,             // In basis points
             ttl:          6 hours,         // In seconds
             tau:          6 hours,         // In seconds
@@ -657,7 +657,7 @@ contract DssSpellTest is DssSpellTestBase {
         assertEq(chainlog.getAddress("NS2DRP_A_URN"), addr.addr("NS2DRP_A_URN"));
         assertEq(chainlog.getAddress("NS2DRP_A_INPUT_CONDUIT"), addr.addr("NS2DRP_A_INPUT_CONDUIT"));
         assertEq(chainlog.getAddress("NS2DRP_A_OUTPUT_CONDUIT"), addr.addr("NS2DRP_A_OUTPUT_CONDUIT"));
-        assertEq(chainlog.getAddress("NS2DRP_LIQUIDATION_ORACLE"), addr.addr("NS2DRP_LIQUIDATION_ORACLE"));
+        assertEq(chainlog.getAddress("MIP21_LIQUIDATION_ORACLE"), addr.addr("MIP21_LIQUIDATION_ORACLE"));
     }
 
     function testSpellIsCast_NS2DRP_INTEGRATION_BUMP() public {
