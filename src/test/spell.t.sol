@@ -387,7 +387,7 @@ contract DssSpellTestBase is DSTest, DSMath {
             line:         5 * MILLION,     // In whole Dai units // 50 million
             dust:         0,               // In whole Dai units
             pct:          360,             // In basis points
-            chop:         0,               // In basis points     
+            chop:         0,               // In basis points
             dunk:         0,               // In whole Dai units
             mat:          10000,           // In basis points // 105%
             beg:          300,             // In basis points
@@ -565,7 +565,7 @@ contract DssSpellTestBase is DSTest, DSMath {
         assertTrue(duty >= RAY && duty < 1000000073014496989316680335);  // gt 0 and lt 1000%
         assertTrue(diffCalc(expectedRate(values.collaterals[ilk].pct), yearlyYield(rates.rates(values.collaterals[ilk].pct))) <= TOLERANCE);
         assertTrue(values.collaterals[ilk].pct < THOUSAND * THOUSAND);   // check value lt 1000%
-        
+
         {
         (,,, uint256 line, uint256 dust) = vat.ilks(ilk);
         // Convert whole Dai units to expected RAD
@@ -589,13 +589,13 @@ contract DssSpellTestBase is DSTest, DSMath {
         assertEq(rwajoin.wards(address(makerDeployer06)), 0); // Check deployer denied
         assertEq(rwajoin.wards(address(pauseProxy)), 1); // Check pause_proxy ward
         }
-    
+
         {
         (, uint256 chop, uint256 dunk) = cat.ilks(ilk);
          assertEq(chop, values.collaterals[ilk].chop);
          assertEq(dunk, values.collaterals[ilk].dunk);
-        } 
-        
+        }
+
         {
         (address flipper,,) = cat.ilks(ilk);
         assertEq(flipper, address(0));
@@ -674,9 +674,9 @@ contract DssSpellTest is DssSpellTestBase {
         hevm.warp(castTime);
         (, address pip, ,) = oracle.ilks("NS2DRP-A");
 
-        assertEq(DSValueAbstract(pip).read(), bytes32(5366480 * WAD));
+        assertEq(DSValueAbstract(pip).read(), bytes32(5_366_480 * WAD));
         bumpSpell.cast();
-        assertEq(DSValueAbstract(pip).read(), bytes32(5466480 * WAD));
+        assertEq(DSValueAbstract(pip).read(), bytes32(5_466_480 * WAD));
     }
 
     function testSpellIsCast_NS2DRP_INTEGRATION_TELL() public {

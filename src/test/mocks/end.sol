@@ -24,13 +24,13 @@ contract EndMock is Mock, Auth {
         wards[msg.sender] = 1;
     }
 
-    function debt() external returns (uint) {
+    function debt() external view returns (uint) {
         return values_uint["debt"];
     }
 
     // unit test helpers
-    function setDebt(uint debt) external {
-        values_uint["debt"] = debt;
+    function setDebt(uint debt_) external {
+        values_uint["debt"] = debt_;
     }
 
 }
