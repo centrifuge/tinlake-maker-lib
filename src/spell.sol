@@ -64,7 +64,7 @@ contract SpellAction {
 
     uint256 constant NS2DRP_A_INITIAL_DC    = 5 * MILLION * RAD; 
     // CreditLine + 2 years of stability fee
-    uint256 constant NS2DRP_A_INITIAL_PRICE = 5366480 * WAD; // 5,366,480
+    uint256 constant NS2DRP_A_INITIAL_PRICE = 5_366_480 * WAD; // 5,366,480
     // CreditLine + 1 years of stability fee
     // uint256 constant NS2DRP_A_INITIAL_PRICE = 5180000 * WAD; // 5,180,000
 
