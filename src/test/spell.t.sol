@@ -199,7 +199,7 @@ contract BumpSpell is TestSpell {
 
 contract DssSpellTestBase is DSTest, DSMath {
     // populate with mainnet spell if needed
-    // address constant KOVAN_SPELL = address(0xdCB87e8149F7bE368ec077b0D92C7ADAC8bB919e);
+    address constant KOVAN_SPELL = address(0);
     // this needs to be updated
     // uint256 constant SPELL_CREATED = 1614270940;
 
@@ -352,7 +352,8 @@ contract DssSpellTestBase is DSTest, DSMath {
         hevm = Hevm(address(CHEAT_CODE));
         rates = new Rates();
 
-        spell = new RwaSpell();
+        spell = KOVAN_SPELL != address(0) ?
+            RwaSpell(KOVAN_SPELL) : new RwaSpell();
 
         // set this contract as ward on mgr
         hevm.store(mgr_, keccak256(abi.encode(address(this), uint(0))), bytes32(uint(1)));
