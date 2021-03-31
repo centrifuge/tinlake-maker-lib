@@ -126,7 +126,7 @@ contract CullSpellAction {
 
     function execute() public {
         RwaLiquidationLike(
-            CHANGELOG.getAddress("MIP21_LIQUIDATION_ORACLE")
+            CHANGELOG.getAddress("NS2DRP_LIQUIDATION_ORACLE")
         ).cull(ilk, CHANGELOG.getAddress("NS2DRP_A_URN"));
     }
 }
@@ -145,7 +145,7 @@ contract CureSpellAction {
 
     function execute() public {
         RwaLiquidationLike(
-            CHANGELOG.getAddress("MIP21_LIQUIDATION_ORACLE")
+            CHANGELOG.getAddress("NS2DRP_LIQUIDATION_ORACLE")
         ).cure(ilk);
     }
 }
@@ -165,7 +165,7 @@ contract TellSpellAction {
     function execute() public {
         VatAbstract(CHANGELOG.getAddress("MCD_VAT")).file(ilk, "line", 0);
         RwaLiquidationLike(
-            CHANGELOG.getAddress("MIP21_LIQUIDATION_ORACLE")
+            CHANGELOG.getAddress("NS2DRP_LIQUIDATION_ORACLE")
         ).tell(ilk);
     }
 }
@@ -185,8 +185,8 @@ contract BumpSpellAction {
 
     function execute() public {
         RwaLiquidationLike(
-            CHANGELOG.getAddress("MIP21_LIQUIDATION_ORACLE")
-        ).bump(ilk, 1070 * WAD);
+            CHANGELOG.getAddress("NS2DRP_LIQUIDATION_ORACLE")
+        ).bump(ilk, 5200000 * WAD);
     }
 }
 
@@ -367,7 +367,7 @@ contract DssSpellTestBase is DSTest, DSMath {
         //
         afterSpell = SystemValues({
             pot_dsr:               0,                     // In basis points
-            vat_Line:              12320 * MILLION / 100, // In whole Dai units
+            vat_Line:              1867022462695350358129361112284276089361426420400424096,// In whole Dai units
             pause_delay:           60,                    // In seconds
             vow_wait:              3600,                  // In seconds
             vow_dump:              2,                     // In whole Dai units
@@ -375,21 +375,21 @@ contract DssSpellTestBase is DSTest, DSMath {
             vow_bump:              10,                    // In whole Dai units
             vow_hump:              500,                   // In whole Dai units
             cat_box:               10 * THOUSAND,         // In whole Dai units
-            osm_mom_authority:     address(0),            // OsmMom authority
-            flipper_mom_authority: address(0),            // FlipperMom authority
-            ilk_count:             18                     // Num expected in system
+            osm_mom_authority:     addr.addr("MCD_ADM"),  // OsmMom authority -> added addr.addr("MCD_ADM")
+            flipper_mom_authority: addr.addr("MCD_ADM"),  // FlipperMom authority -> added addr.addr("MCD_ADM")
+            ilk_count:             24                     // Num expected in system
         });
 
         //
         // Test for all collateral based changes here
         //
         afterSpell.collaterals["NS2DRP-A"] = CollateralValues({
-            line:         1000,            // In whole Dai units
+            line:         5 * MILLION,     // In whole Dai units // 50 million
             dust:         0,               // In whole Dai units
             pct:          200,             // In basis points
             chop:         1300,            // In basis points
             dunk:         50 * THOUSAND,   // In whole Dai units
-            mat:          15000,           // In basis points
+            mat:          10500,           // In basis points // 105%
             beg:          300,             // In basis points
             ttl:          6 hours,         // In seconds
             tau:          6 hours,         // In seconds
@@ -412,28 +412,15 @@ contract DssSpellTestBase is DSTest, DSMath {
 
     function scheduleWaitAndCastFailEarly() public {
         spell.schedule();
-
-        uint256 castTime = block.timestamp + pause.delay() + 24 hours;
-        uint256 hour = castTime / 1 hours % 24;
-        if (hour >= 14) {
-            castTime -= hour * 3600 - 13 hours;
-        }
-
+        uint256 castTime = block.timestamp + pause.delay() - 1 minutes;
         hevm.warp(castTime);
         spell.cast();
     }
 
     function scheduleWaitAndCastFailLate() public {
-        spell.schedule();
-
-        uint256 castTime = block.timestamp + pause.delay();
-        uint256 hour = castTime / 1 hours % 24;
-        if (hour < 21) {
-            castTime += 21 hours - hour * 3600;
-        }
-
+        uint256 castTime = spell.expiration() + 1 days;
         hevm.warp(castTime);
-        spell.cast();
+        scheduleWaitAndCast();
     }
 
     function vote(address _spell) public {
@@ -499,8 +486,10 @@ contract DssSpellTestBase is DSTest, DSMath {
 
         {
         // Line values in RAD
-        uint256 normalizedLine = values.vat_Line * RAD;
-        assertEq(vat.Line(), normalizedLine);
+        assertEq(vat.Line(), values.vat_Line);
+
+        emit log_named_uint("moin",vat.Line());
+
         assertTrue(
             (vat.Line() >= RAD && vat.Line() < 100 * BILLION * RAD) ||
             vat.Line() == 0
@@ -522,6 +511,7 @@ contract DssSpellTestBase is DSTest, DSMath {
             vow.dump() == 0
         );
         }
+
         {
         // sump values in RAD
         uint256 normalizedSump = values.vow_sump * RAD;
@@ -531,6 +521,7 @@ contract DssSpellTestBase is DSTest, DSMath {
             vow.sump() == 0
         );
         }
+
         {
         // bump values in RAD
         uint normalizedBump = values.vow_bump * RAD;
@@ -540,6 +531,7 @@ contract DssSpellTestBase is DSTest, DSMath {
             vow.bump() == 0
         );
         }
+
         {
         // hump values in RAD
         uint256 normalizedHump = values.vow_hump * RAD;
@@ -572,7 +564,8 @@ contract DssSpellTestBase is DSTest, DSMath {
         for(uint256 i = 0; i < ilks.length; i++) {
             bytes32 ilk_ = ilks[i];
             (uint256 duty,)  = jug.ilks(ilk_);
-
+            emit log_named_uint("duty", duty);
+             emit log_named_uint("duty", rates.rates(values.collaterals[ilk_].pct));
             assertEq(duty, rates.rates(values.collaterals[ilk_].pct));
             // make sure duty is less than 1000% APR
             // bc -l <<< 'scale=27; e( l(10.00)/(60 * 60 * 24 * 365) )'
@@ -631,7 +624,7 @@ contract DssSpellTestBase is DSTest, DSMath {
             GemJoinAbstract join = GemJoinAbstract(reg.join(ilk));
             assertEq(join.wards(address(makerDeployer06)), 0); // Check deployer denied
             assertEq(join.wards(address(pauseProxy)), 1); // Check pause_proxy ward
-            }
+           }
         }
         assertEq(sumlines, values.vat_Line);
     }
@@ -667,272 +660,161 @@ contract DssSpellTest is DssSpellTestBase {
         scheduleWaitAndCast();
         assertTrue(spell.done());
 
-        // TODO: add these back into the test
-        // checkSystemValues(afterSpell);
-
+        checkSystemValues(afterSpell);
         // checkCollateralValues(afterSpell);
     }
 
-    // function testFailWrongDay() public {
-    //     vote(address(spell));
-    //     scheduleWaitAndCastFailDay();
-    // }
+    function testFailTooLate() public {
+        vote(address(spell));
+        scheduleWaitAndCastFailLate();
+    }
 
-    // function testFailTooEarly() public {
-    //     vote(address(spell));
-    //     scheduleWaitAndCastFailEarly();
-    // }
+    function testFailTooEarly() public {
+        vote(address(spell));
+        scheduleWaitAndCastFailEarly();
+    }
 
-    // function testFailTooLate() public {
-    //     vote(address(spell));
-    //     scheduleWaitAndCastFailLate();
-    // }
+    function testChainlogValues() public {
+        vote(address(spell));
+        scheduleWaitAndCast();
+        assertTrue(spell.done());
 
+        assertEq(chainlog.getAddress("NS2DRP"), addr.addr("NS2DRP"));
+        assertEq(chainlog.getAddress("MCD_JOIN_NS2DRP_A"), addr.addr("MCD_JOIN_NS2DRP_A"));
+        assertEq(chainlog.getAddress("NS2DRP_A_URN"), addr.addr("NS2DRP_A_URN"));
+        assertEq(chainlog.getAddress("NS2DRP_A_INPUT_CONDUIT"), addr.addr("NS2DRP_A_INPUT_CONDUIT"));
+        assertEq(chainlog.getAddress("NS2DRP_A_OUTPUT_CONDUIT"), addr.addr("NS2DRP_A_OUTPUT_CONDUIT"));
+        assertEq(chainlog.getAddress("NS2DRP_LIQUIDATION_ORACLE"), addr.addr("NS2DRP_LIQUIDATION_ORACLE"));
+    }
 
-//     function testChainlogValues() public {
-//         vote(address(spell));
-//         scheduleWaitAndCast();
-//         assertTrue(spell.done());
+    function testSpellIsCast_NS2DRP_INTEGRATION_BUMP() public {
+        vote(address(spell));
+        scheduleWaitAndCast();
+        assertTrue(spell.done());
 
-//         assertEq(chainlog.getAddress("NS2DRP"), addr.addr("NS2DRP"));
-//         assertEq(chainlog.getAddress("MCD_JOIN_NS2DRP_A"), addr.addr("MCD_JOIN_NS2DRP_A"));
-//         assertEq(chainlog.getAddress("NS2DRP_A_URN"), addr.addr("NS2DRP_A_URN"));
-//         assertEq(chainlog.getAddress("NS2DRP_A_INPUT_CONDUIT"), addr.addr("NS2DRP_A_INPUT_CONDUIT"));
-//         assertEq(chainlog.getAddress("NS2DRP_A_OUTPUT_CONDUIT"), addr.addr("NS2DRP_A_OUTPUT_CONDUIT"));
-//         assertEq(chainlog.getAddress("MIP21_LIQUIDATION_ORACLE"), addr.addr("MIP21_LIQUIDATION_ORACLE"));
-//     }
+        bumpSpell = new BumpSpell();
+        vote(address(bumpSpell));
 
-//     function testSpellIsCast_NS2DRP_INTEGRATION_BUMP() public {
-//         vote(address(spell));
-//         scheduleWaitAndCast();
-//         assertTrue(spell.done());
+        bumpSpell.schedule();
 
-//         bumpSpell = new BumpSpell();
-//         vote(address(bumpSpell));
+        uint256 castTime = block.timestamp + pause.delay();
+        hevm.warp(castTime);
+        (, address pip, ,) = oracle.ilks("NS2DRP-A");
 
-//         bumpSpell.schedule();
+        assertEq(DSValueAbstract(pip).read(), bytes32(5180000 * WAD));
+        bumpSpell.cast();
+        assertEq(DSValueAbstract(pip).read(), bytes32(5200000 * WAD));
+    }
 
-//         uint256 castTime = block.timestamp + pause.delay();
-//         hevm.warp(castTime);
-//         (, address pip, ,) = oracle.ilks("NS2DRP-A");
+    function testSpellIsCast_NS2DRP_INTEGRATION_TELL() public {
+        vote(address(spell));
+        scheduleWaitAndCast();
+        assertTrue(spell.done());
 
-//         assertEq(DSValueAbstract(pip).read(), bytes32(1060 * WAD));
-//         bumpSpell.cast();
-//         assertEq(DSValueAbstract(pip).read(), bytes32(1070 * WAD));
-//     }
+        tellSpell = new TellSpell();
+        vote(address(tellSpell));
 
-//     function testSpellIsCast_NS2DRP_INTEGRATION_TELL() public {
-//         vote(address(spell));
-//         scheduleWaitAndCast();
-//         assertTrue(spell.done());
+        tellSpell.schedule();
 
-//         tellSpell = new TellSpell();
-//         vote(address(tellSpell));
+        uint256 castTime = block.timestamp + pause.delay();
+        hevm.warp(castTime);
+        (, , , uint48 tocPre) = oracle.ilks("NS2DRP-A");
+        assertTrue(tocPre == 0);
+        assertTrue(oracle.good("NS2DRP-A"));
+        tellSpell.cast();
+        (, , , uint48 tocPost) = oracle.ilks("NS2DRP-A");
+        assertTrue(tocPost > 0);
+        assertTrue(oracle.good("NS2DRP-A"));
+        hevm.warp(block.timestamp + 600);
+        assertTrue(!oracle.good("NS2DRP-A"));
+    }
 
-//         tellSpell.schedule();
+    function testSpellIsCast_NS2DRP_INTEGRATION_TELL_CURE_GOOD() public {
+        vote(address(spell));
+        scheduleWaitAndCast();
+        assertTrue(spell.done());
 
-//         uint256 castTime = block.timestamp + pause.delay();
-//         hevm.warp(castTime);
-//         (, , , uint48 tocPre) = oracle.ilks("NS2DRP-A");
-//         assertTrue(tocPre == 0);
-//         assertTrue(oracle.good("NS2DRP-A"));
-//         tellSpell.cast();
-//         (, , , uint48 tocPost) = oracle.ilks("NS2DRP-A");
-//         assertTrue(tocPost > 0);
-//         assertTrue(oracle.good("NS2DRP-A"));
-//         hevm.warp(block.timestamp + 600);
-//         assertTrue(!oracle.good("NS2DRP-A"));
-//     }
+        tellSpell = new TellSpell();
+        vote(address(tellSpell));
 
-//     function testSpellIsCast_NS2DRP_INTEGRATION_TELL_CURE_GOOD() public {
-//         vote(address(spell));
-//         scheduleWaitAndCast();
-//         assertTrue(spell.done());
+        tellSpell.schedule();
 
-//         tellSpell = new TellSpell();
-//         vote(address(tellSpell));
+        uint256 castTime = block.timestamp + pause.delay();
+        hevm.warp(castTime);
+        tellSpell.cast();
+        assertTrue(oracle.good(ilk));
+        hevm.warp(block.timestamp + 600);
+        assertTrue(!oracle.good(ilk));
 
-//         tellSpell.schedule();
+        cureSpell = new CureSpell();
+        vote(address(cureSpell));
 
-//         uint256 castTime = block.timestamp + pause.delay();
-//         hevm.warp(castTime);
-//         tellSpell.cast();
-//         assertTrue(oracle.good(ilk));
-//         hevm.warp(block.timestamp + 600);
-//         assertTrue(!oracle.good(ilk));
+        cureSpell.schedule();
+        castTime = block.timestamp + pause.delay();
+        hevm.warp(castTime);
+        cureSpell.cast();
+        assertTrue(oracle.good(ilk));
+        (,,, uint48 toc) = oracle.ilks(ilk);
+        assertEq(uint256(toc), 0);
+    }
 
-//         cureSpell = new CureSpell();
-//         vote(address(cureSpell));
+    function testFailSpellIsCast_NS2DRP_INTEGRATION_CURE() public {
+        vote(address(spell));
+        scheduleWaitAndCast();
+        assertTrue(spell.done());
 
-//         cureSpell.schedule();
-//         castTime = block.timestamp + pause.delay();
-//         hevm.warp(castTime);
-//         cureSpell.cast();
-//         assertTrue(oracle.good(ilk));
-//         (,,, uint48 toc) = oracle.ilks(ilk);
-//         assertEq(uint256(toc), 0);
-//     }
+        cureSpell = new CureSpell();
+        vote(address(cureSpell));
 
-//     function testFailSpellIsCast_NS2DRP_INTEGRATION_CURE() public {
-//         vote(address(spell));
-//         scheduleWaitAndCast();
-//         assertTrue(spell.done());
+        cureSpell.schedule();
+        uint256 castTime = block.timestamp + pause.delay();
+        hevm.warp(castTime);
+        cureSpell.cast();
+    }
 
-//         cureSpell = new CureSpell();
-//         vote(address(cureSpell));
+    function testSpellIsCast_NS2DRP_INTEGRATION_TELL_CULL() public {
+        vote(address(spell));
+        scheduleWaitAndCast();
+        assertTrue(spell.done());
+        assertTrue(oracle.good("NS2DRP-A"));
 
-//         cureSpell.schedule();
-//         uint256 castTime = block.timestamp + pause.delay();
-//         hevm.warp(castTime);
-//         cureSpell.cast();
-//     }
+        tellSpell = new TellSpell();
+        vote(address(tellSpell));
 
-//     function testSpellIsCast_NS2DRP_INTEGRATION_TELL_CULL() public {
-//         vote(address(spell));
-//         scheduleWaitAndCast();
-//         assertTrue(spell.done());
-//         assertTrue(oracle.good("NS2DRP-A"));
+        tellSpell.schedule();
 
-//         tellSpell = new TellSpell();
-//         vote(address(tellSpell));
+        uint256 castTime = block.timestamp + pause.delay();
+        hevm.warp(castTime);
+        tellSpell.cast();
+        assertTrue(oracle.good("NS2DRP-A"));
+        hevm.warp(block.timestamp + 600);
+        assertTrue(!oracle.good("NS2DRP-A"));
 
-//         tellSpell.schedule();
+        cullSpell = new CullSpell();
+        vote(address(cullSpell));
 
-//         uint256 castTime = block.timestamp + pause.delay();
-//         hevm.warp(castTime);
-//         tellSpell.cast();
-//         assertTrue(oracle.good("NS2DRP-A"));
-//         hevm.warp(block.timestamp + 600);
-//         assertTrue(!oracle.good("NS2DRP-A"));
+        cullSpell.schedule();
+        castTime = block.timestamp + pause.delay();
+        hevm.warp(castTime);
+        cullSpell.cast();
+        assertTrue(!oracle.good("NS2DRP-A"));
+        (, address pip,,) = oracle.ilks("NS2DRP-A");
+        assertEq(DSValueAbstract(pip).read(), bytes32(0));
+    }
 
-//         cullSpell = new CullSpell();
-//         vote(address(cullSpell));
+    function testSpellIsCast_NS2DRP_END() public {
+        vote(address(spell));
+        scheduleWaitAndCast();
+        assertTrue(spell.done());
 
-//         cullSpell.schedule();
-//         castTime = block.timestamp + pause.delay();
-//         hevm.warp(castTime);
-//         cullSpell.cast();
-//         assertTrue(!oracle.good("NS2DRP-A"));
-//         (, address pip,,) = oracle.ilks("NS2DRP-A");
-//         assertEq(DSValueAbstract(pip).read(), bytes32(0));
-//     }
+        endSpell = new EndSpell();
+        vote(address(endSpell));
 
-//     function testSpellIsCast_NS2DRP_OPERATOR_LOCK_DRAW_CONDUITS_WIPE_FREE() public {
-//         vote(address(spell));
-//         scheduleWaitAndCast();
-//         assertTrue(spell.done());
+        endSpell.schedule();
 
-//         hevm.warp(now + 10 days); // Let rate be > 1
-
-//         hevm.store(
-//             address(rwagem),
-//             keccak256(abi.encode(address(this), uint256(0))),
-//             bytes32(uint256(2 ether))
-//         );
-//         hevm.store(
-//             address(rwagem),
-//             keccak256(abi.encode(address(this), uint256(1))),
-//             bytes32(uint256(1 ether))
-//         );
-//         // setting address(this) as operator
-//         hevm.store(
-//             address(rwaurn),
-//             keccak256(abi.encode(address(this), uint256(1))),
-//             bytes32(uint256(1))
-//         );
-//         assertEq(rwagem.totalSupply(), 1 * WAD);
-//         assertEq(rwagem.balanceOf(address(this)), 1 * WAD);
-//         assertEq(rwaurn.can(address(this)), 1);
-
-//         rwagem.approve(address(rwaurn), 1 * WAD);
-//         rwaurn.lock(1 * WAD);
-//         assertEq(dai.balanceOf(address(rwaconduitout)), 0);
-//         rwaurn.draw(1 * WAD);
-
-//         (, uint256 rate,,,) = vat.ilks("NS2DRP-A");
-
-//         uint256 dustInVat = vat.dai(address(rwaurn));
-
-//         (uint256 ink, uint256 art) = vat.urns(ilk, address(rwaurn));
-//         assertEq(ink, 1 * WAD);
-//         assertEq(art, (1 * RAD + dustInVat) / rate);
-//         assertEq(dai.balanceOf(address(rwaconduitout)), 1 * WAD);
-
-//         // wards
-//         hevm.store(
-//             address(rwaconduitout),
-//             keccak256(abi.encode(address(this), uint256(0))),
-//             bytes32(uint256(1))
-//         );
-
-//         // can
-//         hevm.store(
-//             address(rwaconduitout),
-//             keccak256(abi.encode(address(this), uint256(1))),
-//             bytes32(uint256(1))
-//         );
-
-//         assertEq(dai.balanceOf(address(rwaconduitout)), 1 * WAD);
-
-//         rwaconduitout.kiss(address(this));
-//         rwaconduitout.pick(address(this));
-
-//         rwaconduitout.push();
-
-//         assertEq(dai.balanceOf(address(rwaconduitout)), 0);
-//         assertEq(dai.balanceOf(address(this)), 1 * WAD);
-
-//         hevm.warp(now + 10 days);
-
-//         (ink, art) = vat.urns(ilk, address(rwaurn));
-//         assertEq(ink, 1 * WAD);
-//         assertEq(art, (1 * RAD + dustInVat) / rate);
-//         (ink,) = vat.urns(ilk, address(this));
-//         assertEq(ink, 0);
-
-//         jug.drip("NS2DRP-A");
-
-//         (, rate,,,) = vat.ilks("NS2DRP-A");
-
-//         uint256 daiToPay = (art * rate - dustInVat) / RAY + 1; // extra wei rounding
-
-//         hevm.store(
-//             address(dai),
-//             keccak256(abi.encode(address(this), uint256(2))),
-//             bytes32(uint256(daiToPay))
-//         ); // Forcing extra DAI balance to pay accumulated fee
-
-//         assertEq(dai.balanceOf(address(rwaconduitin)), 0);
-//         dai.transfer(address(rwaconduitin), daiToPay);
-//         assertEq(dai.balanceOf(address(rwaconduitin)), daiToPay);
-//         rwaconduitin.push();
-
-//         assertEq(dai.balanceOf(address(rwaurn)), daiToPay);
-//         assertEq(dai.balanceOf(address(rwaconduitin)), 0);
-
-//         rwaurn.wipe(daiToPay);
-//         rwaurn.free(1 * WAD);
-//         (ink, art) = vat.urns(ilk, address(rwaurn));
-//         assertEq(ink, 0);
-//         assertEq(art, 0);
-//         (ink,) = vat.urns(ilk, address(this));
-//         assertEq(ink, 0);
-//     }
-
-//     function testSpellIsCast_NS2DRP_END() public {
-//         vote(address(spell));
-//         scheduleWaitAndCast();
-//         assertTrue(spell.done());
-
-//         endSpell = new EndSpell();
-//         vote(address(endSpell));
-
-//         endSpell.schedule();
-
-//         uint256 castTime = block.timestamp + pause.delay();
-//         hevm.warp(castTime);
-//         endSpell.cast();
-
-//         // TODO: finish
-//     }
+        uint256 castTime = block.timestamp + pause.delay();
+        hevm.warp(castTime);
+        endSpell.cast();
+        // add assertions
+    }
  }

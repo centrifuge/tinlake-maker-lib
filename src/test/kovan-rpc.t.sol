@@ -69,9 +69,7 @@ contract KovanRPC is DssSpellTestBase {
         drop.approve(address(dropMgr), uint(-1));
         dai.approve(address(dropMgr), uint(-1));
 
-
         //execute spell and lock rwa token
-
         executeSpell();
         lock();
     }
