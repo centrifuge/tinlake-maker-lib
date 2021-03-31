@@ -28,5 +28,5 @@ jobs:
           signingKey: ''
       - name: test
         env:
-          ETH_RPC_URL: https://kovan.infura.io/v3/f9ba987e8cb34418bb53cdbd4d8321b5
+          ETH_RPC_URL: ${{ secrets.ETH_RPC_URL }}
         run: nix-env -f https://github.com/dapphub/dapptools/archive/master.tar.gz -iA solc-static-versions.solc_0_5_12 && nix-shell --command "make test"

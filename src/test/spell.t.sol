@@ -367,7 +367,7 @@ contract DssSpellTestBase is DSTest, DSMath {
         //
         afterSpell = SystemValues({
             pot_dsr:               0,                     // In basis points
-            vat_Line:              1867022462695350358129361112284276089361426420400424096,// In whole Dai units
+            vat_Line:              1872022462695350358129361112284276089361426420400424096,// In whole Dai units
             pause_delay:           60,                    // In seconds
             vow_wait:              3600,                  // In seconds
             vow_dump:              2,                     // In whole Dai units
@@ -377,7 +377,7 @@ contract DssSpellTestBase is DSTest, DSMath {
             cat_box:               10 * THOUSAND,         // In whole Dai units
             osm_mom_authority:     addr.addr("MCD_ADM"),  // OsmMom authority -> added addr.addr("MCD_ADM")
             flipper_mom_authority: addr.addr("MCD_ADM"),  // FlipperMom authority -> added addr.addr("MCD_ADM")
-            ilk_count:             24                     // Num expected in system
+            ilk_count:             25                     // Num expected in system
         });
 
         //
@@ -386,7 +386,7 @@ contract DssSpellTestBase is DSTest, DSMath {
         afterSpell.collaterals["NS2DRP-A"] = CollateralValues({
             line:         5 * MILLION,     // In whole Dai units // 50 million
             dust:         0,               // In whole Dai units
-            pct:          200,             // In basis points
+            pct:          360,             // In basis points
             chop:         1300,            // In basis points
             dunk:         50 * THOUSAND,   // In whole Dai units
             mat:          10500,           // In basis points // 105%
@@ -487,9 +487,6 @@ contract DssSpellTestBase is DSTest, DSMath {
         {
         // Line values in RAD
         assertEq(vat.Line(), values.vat_Line);
-
-        emit log_named_uint("moin",vat.Line());
-
         assertTrue(
             (vat.Line() >= RAD && vat.Line() < 100 * BILLION * RAD) ||
             vat.Line() == 0
@@ -559,74 +556,75 @@ contract DssSpellTestBase is DSTest, DSMath {
     }
 
     function checkCollateralValues(SystemValues storage values) internal {
-        uint256 sumlines;
-        bytes32[] memory ilks = reg.list();
-        for(uint256 i = 0; i < ilks.length; i++) {
-            bytes32 ilk_ = ilks[i];
-            (uint256 duty,)  = jug.ilks(ilk_);
-            emit log_named_uint("duty", duty);
-             emit log_named_uint("duty", rates.rates(values.collaterals[ilk_].pct));
-            assertEq(duty, rates.rates(values.collaterals[ilk_].pct));
-            // make sure duty is less than 1000% APR
-            // bc -l <<< 'scale=27; e( l(10.00)/(60 * 60 * 24 * 365) )'
-            // 1000000073014496989316680335
-            assertTrue(duty >= RAY && duty < 1000000073014496989316680335);  // gt 0 and lt 1000%
-            assertTrue(diffCalc(expectedRate(values.collaterals[ilk_].pct), yearlyYield(rates.rates(values.collaterals[ilk_].pct))) <= TOLERANCE);
-            assertTrue(values.collaterals[ilk_].pct < THOUSAND * THOUSAND);   // check value lt 1000%
-            {
-            (,,, uint256 line, uint256 dust) = vat.ilks(ilk);
-            // Convert whole Dai units to expected RAD
-            uint256 normalizedTestLine = values.collaterals[ilk_].line * RAD;
-            sumlines += values.collaterals[ilk_].line;
-            assertEq(line, normalizedTestLine);
-            assertTrue((line >= RAD && line < BILLION * RAD) || line == 0);  // eq 0 or gt eq 1 RAD and lt 1B
-            uint256 normalizedTestDust = values.collaterals[ilk_].dust * RAD;
-            assertEq(dust, normalizedTestDust);
-            assertTrue((dust >= RAD && dust < 10 * THOUSAND * RAD) || dust == 0); // eq 0 or gt eq 1 and lt 10k
-            }
-            {
-            (, uint256 chop, uint256 dunk) = cat.ilks(ilk);
-            // Convert BP to system expected value
-            uint256 normalizedTestChop = (values.collaterals[ilk_].chop * 10**14) + WAD;
-            assertEq(chop, normalizedTestChop);
-            // make sure chop is less than 100%
-            assertTrue(chop >= WAD && chop < 2 * WAD);   // penalty gt eq 0% and lt 100%
-            // Convert whole Dai units to expected RAD
-            uint256 normalizedTestDunk = values.collaterals[ilk_].dunk * RAD;
-            assertEq(dunk, normalizedTestDunk);
-            // put back in after LIQ-1.2
-            assertTrue(dunk >= RAD && dunk < MILLION * RAD);
-            }
-            {
-            (,uint256 mat) = spot.ilks(ilk);
-            // Convert BP to system expected value
-            uint256 normalizedTestMat = (values.collaterals[ilk_].mat * 10**23);
-            assertEq(mat, normalizedTestMat);
-            assertTrue(mat >= RAY && mat < 10 * RAY);    // cr eq 100% and lt 1000%
-            }
-            {
-            (address flipper,,) = cat.ilks(ilk);
-            FlipAbstract flip = FlipAbstract(flipper);
-            // Convert BP to system expected value
-            uint256 normalizedTestBeg = (values.collaterals[ilk_].beg + 10000)  * 10**14;
-            assertEq(uint256(flip.beg()), normalizedTestBeg);
-            assertTrue(flip.beg() >= WAD && flip.beg() < 105 * WAD / 100);  // gt eq 0% and lt 5%
-            assertEq(uint256(flip.ttl()), values.collaterals[ilk_].ttl);
-            assertTrue(flip.ttl() >= 600 && flip.ttl() < 10 hours);         // gt eq 10 minutes and lt 10 hours
-            assertEq(uint256(flip.tau()), values.collaterals[ilk_].tau);
-            assertTrue(flip.tau() >= 600 && flip.tau() <= 3 days);          // gt eq 10 minutes and lt eq 3 days
+        (uint256 duty,)  = jug.ilks(ilk);
 
-            assertEq(flip.wards(address(cat)), values.collaterals[ilk_].liquidations);  // liquidations == 1 => on
-            assertEq(flip.wards(address(makerDeployer06)), 0); // Check deployer denied
-            assertEq(flip.wards(address(pauseProxy)), 1); // Check pause_proxy ward
-            }
-            {
-            GemJoinAbstract join = GemJoinAbstract(reg.join(ilk));
-            assertEq(join.wards(address(makerDeployer06)), 0); // Check deployer denied
-            assertEq(join.wards(address(pauseProxy)), 1); // Check pause_proxy ward
-           }
+        assertEq(duty, rates.rates(values.collaterals[ilk].pct));
+        // make sure duty is less than 1000% APR
+        // bc -l <<< 'scale=27; e( l(10.00)/(60 * 60 * 24 * 365) )'
+        // 1000000073014496989316680335
+        assertTrue(duty >= RAY && duty < 1000000073014496989316680335);  // gt 0 and lt 1000%
+        assertTrue(diffCalc(expectedRate(values.collaterals[ilk].pct), yearlyYield(rates.rates(values.collaterals[ilk].pct))) <= TOLERANCE);
+        assertTrue(values.collaterals[ilk].pct < THOUSAND * THOUSAND);   // check value lt 1000%
+        
+        {
+        (,,, uint256 line, uint256 dust) = vat.ilks(ilk);
+        // Convert whole Dai units to expected RAD
+        uint256 normalizedTestLine = values.collaterals[ilk].line * RAD;
+        assertEq(line, normalizedTestLine);
+        assertTrue((line >= RAD && line < BILLION * RAD) || line == 0);  // eq 0 or gt eq 1 RAD and lt 1B
+        uint256 normalizedTestDust = values.collaterals[ilk].dust * RAD;
+        assertEq(dust, normalizedTestDust);
+        assertTrue((dust >= RAD && dust < 10 * THOUSAND * RAD) || dust == 0); // eq 0 or gt eq 1 and lt 10k
         }
-        assertEq(sumlines, values.vat_Line);
+
+        {
+        (,uint256 mat) = spot.ilks(ilk);
+        // Convert BP to system expected value
+        uint256 normalizedTestMat = (values.collaterals[ilk].mat * 10**23);
+        assertEq(mat, normalizedTestMat);
+        assertTrue(mat >= RAY && mat < 10 * RAY);    // cr eq 100% and lt 1000%
+        }
+
+        {
+        assertEq(rwajoin.wards(address(makerDeployer06)), 0); // Check deployer denied
+        assertEq(rwajoin.wards(address(pauseProxy)), 1); // Check pause_proxy ward
+        }
+    
+        // values not set in cat
+        // {
+        // (, uint256 chop, uint256 dunk) = cat.ilks(ilk);
+        // // Convert BP to system expected value
+        // uint256 normalizedTestChop = (values.collaterals[ilk].chop * 10**14) + WAD;
+        // emit log_named_uint("chop", chop);
+        // emit log_named_uint("dunk", dunk);
+        // emit log_named_uint("normalizedTestChop", normalizedTestChop);        
+        // assertEq(chop, normalizedTestChop);
+        // // make sure chop is less than 100%
+        // assertTrue(chop >= WAD && chop < 2 * WAD);   // penalty gt eq 0% and lt 100%
+        // // Convert whole Dai units to expected RAD
+        // uint256 normalizedTestDunk = values.collaterals[ilk].dunk * RAD;
+        // assertEq(dunk, normalizedTestDunk);
+        // // put back in after LIQ-1.2
+        // assertTrue(dunk >= RAD && dunk < MILLION * RAD);
+        // } https://tinlake.centrifuge.io/pool/0x53b2d22d07E069a3b132BfeaaD275b10273d381E/new-silver-2/assets/asset?assetId=7
+        
+        // flipper address not set in cat
+        // {
+        // (address flipper,,) = cat.ilks(ilk);
+        // emit log_named_address("address", flipper);
+        // FlipAbstract flip = FlipAbstract(flipper);
+        // // Convert BP to system expected value
+        // uint256 normalizedTestBeg = (values.collaterals[ilk].beg + 10000)  * 10**14;
+        // assertEq(uint256(flip.beg()), normalizedTestBeg);
+        // assertTrue(flip.beg() >= WAD && flip.beg() < 105 * WAD / 100);  // gt eq 0% and lt 5%
+        // assertEq(uint256(flip.ttl()), values.collaterals[ilk].ttl);
+        // assertTrue(flip.ttl() >= 600 && flip.ttl() < 10 hours);         // gt eq 10 minutes and lt 10 hours
+        // assertEq(uint256(flip.tau()), values.collaterals[ilk].tau);
+        // assertTrue(flip.tau() >= 600 && flip.tau() <= 3 days);          // gt eq 10 minutes and lt eq 3 days
+        // assertEq(flip.wards(address(cat)), values.collaterals[ilk_].liquidations);  // liquidations == 1 => on
+        // assertEq(flip.wards(address(makerDeployer06)), 0); // Check deployer denied
+        // assertEq(flip.wards(address(pauseProxy)), 1); // Check pause_proxy ward
+        // }
     }
 
     function executeSpell() public {
@@ -661,7 +659,7 @@ contract DssSpellTest is DssSpellTestBase {
         assertTrue(spell.done());
 
         checkSystemValues(afterSpell);
-        // checkCollateralValues(afterSpell);
+        checkCollateralValues(afterSpell);
     }
 
     function testFailTooLate() public {
@@ -701,9 +699,9 @@ contract DssSpellTest is DssSpellTestBase {
         hevm.warp(castTime);
         (, address pip, ,) = oracle.ilks("NS2DRP-A");
 
-        assertEq(DSValueAbstract(pip).read(), bytes32(5180000 * WAD));
+        assertEq(DSValueAbstract(pip).read(), bytes32(5366480 * WAD));
         bumpSpell.cast();
-        assertEq(DSValueAbstract(pip).read(), bytes32(5200000 * WAD));
+        assertEq(DSValueAbstract(pip).read(), bytes32(5466480 * WAD));
     }
 
     function testSpellIsCast_NS2DRP_INTEGRATION_TELL() public {
@@ -815,6 +813,5 @@ contract DssSpellTest is DssSpellTestBase {
         uint256 castTime = block.timestamp + pause.delay();
         hevm.warp(castTime);
         endSpell.cast();
-        // add assertions
     }
  }

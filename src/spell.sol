@@ -7,7 +7,6 @@ import "dss-interfaces/dss/SpotAbstract.sol";
 import "dss-interfaces/dss/GemJoinAbstract.sol";
 import "dss-interfaces/dapp/DSTokenAbstract.sol";
 import "dss-interfaces/dss/ChainlogAbstract.sol";
-import "ds-test/test.sol";
 
 interface RwaLiquidationLike {
     function wards(address) external returns (uint256);
@@ -39,7 +38,7 @@ interface RwaUrnLike {
     function hope(address) external;
 }
 
-contract SpellAction is DSTest {
+contract SpellAction {
     // KOVAN ADDRESSES
     // The contracts in this list should correspond to MCD core contracts, verify
     // against the current release list at:
@@ -66,7 +65,10 @@ contract SpellAction is DSTest {
     uint256 constant public RAD      = 10 ** 45;
 
     uint256 constant NS2DRP_A_INITIAL_DC    = 5 * MILLION * RAD; 
-    uint256 constant NS2DRP_A_INITIAL_PRICE = 5180000 * WAD; // 5180000
+    // CreditLine + 2 years of stability fee
+    uint256 constant NS2DRP_A_INITIAL_PRICE = 5366480 * WAD; // 5,366,480
+    // CreditLine + 1 years of stability fee
+    // uint256 constant NS2DRP_A_INITIAL_PRICE = 5180000 * WAD; // 5,180,000
 
     // MIP13c3-SP4 Declaration of Intent & Commercial Points -
     // Off-Chain Asset Backed Lender to onboard Real World Assets
@@ -124,8 +126,6 @@ contract SpellAction is DSTest {
 
         // 5 Million debt ceiling
         VatAbstract(MCD_VAT).file(ilk, "line", NS2DRP_A_INITIAL_DC);
-        emit log_named_uint("initial", VatAbstract(MCD_VAT).Line());
-        emit log_named_uint("filed", VatAbstract(MCD_VAT).Line() + NS2DRP_A_INITIAL_DC);
         VatAbstract(MCD_VAT).file("Line", VatAbstract(MCD_VAT).Line() + NS2DRP_A_INITIAL_DC);
 
         // No dust
@@ -148,7 +148,7 @@ contract SpellAction is DSTest {
     }
 }
 
-contract RwaSpell is DSTest {
+contract RwaSpell {
 
     ChainlogAbstract constant CHANGELOG =
         ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
@@ -172,7 +172,6 @@ contract RwaSpell is DSTest {
         assembly { _tag := extcodehash(_action) }
         tag = _tag;
         expiration = block.timestamp + 30 days;
-        emit log_named_uint("exp", expiration);
     }
 
     function schedule() public {
@@ -185,8 +184,6 @@ contract RwaSpell is DSTest {
     function cast() public {
         require(!done, "spell-already-cast");
         done = true;
-        emit log_named_uint("time", block.timestamp);
-        emit log_named_uint("eta", eta);
         pause.exec(action, tag, sig, eta);
     }
 }
