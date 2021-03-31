@@ -199,9 +199,9 @@ contract BumpSpell is TestSpell {
 
 contract DssSpellTestBase is DSTest, DSMath {
     // populate with mainnet spell if needed
-    address constant KOVAN_SPELL = address(0);
+    address constant KOVAN_SPELL = address(0x94caeCD665391a7718cDD4c9a3933DBFD7EAa0d3);
     // this needs to be updated
-    // uint256 constant SPELL_CREATED = 1614270940;
+    uint256 constant SPELL_CREATED = 1617224004;
 
     struct CollateralValues {
         uint256 line;
@@ -610,7 +610,7 @@ contract DssSpellTestBase is DSTest, DSMath {
         assertEq(stringToBytes32(spell.description()),
             stringToBytes32(description));
 
-        assertEq(spell.expiration(), (block.timestamp + 30 days));
+        assertEq(spell.expiration(), (SPELL_CREATED + 30 days));
 
 
         vote(address(spell));
@@ -627,7 +627,7 @@ contract DssSpellTest is DssSpellTestBase {
         assertEq(stringToBytes32(spell.description()),
                 stringToBytes32(description));
 
-        assertEq(spell.expiration(), (block.timestamp + 30 days));
+        assertEq(spell.expiration(), (SPELL_CREATED + 30 days));
 
 
         vote(address(spell));
