@@ -238,6 +238,12 @@ contract TinlakeManager {
         else if (what == "owner") {
             owner = data;
         }
+        else if (what == "vow") {
+            vow = data;
+        }
+        else if (what == "end") {
+            end = data;
+        }
         else if (what == "pool") {
             pool = RedeemLike(data);
         }
