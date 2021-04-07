@@ -242,7 +242,7 @@ contract TinlakeManager {
             vow = data;
         }
         else if (what == "end") {
-            end = data;
+            end = EndLike(data);
         }
         else if (what == "pool") {
             pool = RedeemLike(data);
