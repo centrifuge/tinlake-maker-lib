@@ -29,4 +29,5 @@ jobs:
       - name: test
         env:
           ETH_RPC_URL: ${{ secrets.ETH_RPC_URL }}
+          RPC_ENDPOINT: ${{ secrets.RPC_ENDPOINT }}
         run: nix-env -f https://github.com/dapphub/dapptools/archive/master.tar.gz -iA solc-static-versions.solc_0_5_12 && nix-shell --command "make test"
