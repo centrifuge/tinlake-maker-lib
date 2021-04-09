@@ -54,7 +54,7 @@ contract KovanRPC is DssSpellTestBase {
         // set this contract as owner of dropMgr // override slot 1
         // check what's inside slot 1 with: bytes32 slot = hevm.load(address(dropMgr), bytes32(uint(1)));
         hevm.store(address(dropMgr), bytes32(uint(1)), bytes32(0x0000000000000000000101013bE95e4159a131E56A84657c4ad4D43eC7Cd865d));
-        // ste this contract as ward on the mgr
+        // set this contract as ward on the mgr
         hevm.store(address(dropMgr), keccak256(abi.encode(address(this), uint(0))), bytes32(uint(1)));
 
         assertEq(dropMgr.owner(), address(this));
@@ -69,9 +69,9 @@ contract KovanRPC is DssSpellTestBase {
         drop.approve(address(dropMgr), uint(-1));
         dai.approve(address(dropMgr), uint(-1));
 
-        //execute spell and lock rwa token
-        executeSpell();
-        lock();
+        // spell is already executed on kovan
+        // executeSpell();
+        // lock();
     }
 
     function lock() public {
@@ -80,6 +80,7 @@ contract KovanRPC is DssSpellTestBase {
     }
 
     function testJoinAndDraw() public {
+        uint preBal = drop.balanceOf(address(dropMgr));
         assertEq(dai.balanceOf(address(this)), 1500 ether);
         assertEq(drop.balanceOf(address(this)), 1000 ether);
 
@@ -87,7 +88,7 @@ contract KovanRPC is DssSpellTestBase {
         dropMgr.draw(200 ether);
         assertEq(dai.balanceOf(address(this)), 1700 ether);
         assertEq(drop.balanceOf(address(this)), 600 ether);
-        assertEq(drop.balanceOf(address(dropMgr)), 400 ether);
+        assertEq(drop.balanceOf(address(dropMgr)), preBal + 400 ether);
     }
 
     function testWipeAndExit() public {
