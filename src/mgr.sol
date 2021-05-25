@@ -174,8 +174,7 @@ contract TinlakeManager {
         GemLike(GemJoinLike(urn.gemJoin()).gem()).approve(address(urn), uint256(wad));
         urn.lock(wad);
     }
-    // moves the rwaToken into the vault
-    // requires that mgr contract holds the rwaToken
+    // removes the rwaToken from the vault
     function free(uint256 wad) public auth {
         urn.free(wad);
     }
@@ -275,8 +274,7 @@ contract TinlakeManager {
     }
 
     // triggers the payout of a DROP redemption
-    // method can be called multiple times after the liquidation until all
-    // DROP tokens are redeemed
+    // method can be called multiple times until all DROP is redeemed
     function unwind(uint256 endEpoch) public {
         require(!safe && glad && live, "TinlakeMgr/not-soft-liquidation");
 
@@ -314,6 +312,8 @@ contract TinlakeManager {
         emit Cull(tab);
     }
 
+    // recovers DAI from the Tinlake pool by triggering a payout
+    // method can be called multiple times until all DROP is redeemed
     function recover(uint256 endEpoch) public {
         require(!glad, "TinlakeMgr/not-written-off");
 
