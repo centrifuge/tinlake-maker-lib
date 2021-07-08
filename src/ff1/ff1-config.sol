@@ -24,7 +24,7 @@ contract POOL_CONFIG {
     address constant TRANCHE = 0x63c6883d8fEDE11286007EA080A69f584f27b4a1;
 
 
-    // MIP21 contracts FF1004-A
+    // MIP21 contracts RWA005-A
     address public constant MCD_JOIN = 0x19443a936b99c5c88897aE3eF72d65EcE6a9e4B8;
     address constant GEM = 0x4bA1b1A2876bF7E740eedA5e43D0310f2DF368A9;
     address public constant OPERATOR = 0x17E5954Cdd3611Dd84e444F0ed555CC3a06cB319; // MGR
@@ -34,15 +34,15 @@ contract POOL_CONFIG {
     address public LIQ = 0x2881c5dF65A8D81e38f7636122aFb456514804CC; // MIP21-LIQ-ORACLE
 
     // changelog IDs
-    bytes32 public constant dropID = "FF1004";
-    bytes32 public constant joinID = "MCD_JOIN_FF1004_A";
-    bytes32 public constant urnID = "FF1004_A_URN";
-    bytes32 public constant inputConduitID = "FF1004_A_INPUT_CONDUIT";
-    bytes32 public constant outputConduitID = "FF1004_A_OUTPUT_CONDUIT";
-    bytes32 public constant pipID = "PIP_FF1004";
+    bytes32 public constant dropID = "RWA005";
+    bytes32 public constant joinID = "MCD_JOIN_RWA005_A";
+    bytes32 public constant urnID = "RWA005_A_URN";
+    bytes32 public constant inputConduitID = "RWA005_A_INPUT_CONDUIT";
+    bytes32 public constant outputConduitID = "RWA005_A_OUTPUT_CONDUIT";
+    bytes32 public constant pipID = "PIP_RWA005";
 
     // values, based on https://forum.makerdao.com/t/fft1-drop-collateral-onboarding-risk-evaluation/8036
-    bytes32 public constant ilk = "FF1004-A";
+    bytes32 public constant ilk = "RWA005-A";
     // look up in https://ipfs.io/ipfs/QmefQMseb3AiTapiAKKexdKHig8wroKuZbmLtPLv4u2YwW
     uint256 public constant RATE = 1000000001395766281313196627; // 4.5% stability fee
     uint256 public constant DC = 15 * MILLION * RAD; // creditline: 15 mio
