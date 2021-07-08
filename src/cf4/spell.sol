@@ -7,7 +7,7 @@ import "dss-interfaces/dss/SpotAbstract.sol";
 import "dss-interfaces/dss/GemJoinAbstract.sol";
 import "dss-interfaces/dapp/DSTokenAbstract.sol";
 import "dss-interfaces/dss/ChainlogAbstract.sol";
-import "./ff1-config.sol";
+import "./cf4-config.sol";
 
 interface RwaLiquidationLike {
     function wards(address) external returns (uint256);
@@ -105,7 +105,7 @@ contract SpellAction is POOL_CONFIG {
         JugAbstract(MCD_JUG).file(ilk, "duty", RATE);
 
         // Set the CF4DRP-A min collateralization ratio)
-        SpotAbstract(MCD_SPOT).file(ilk, "mat", 100 * RAY / 100);
+        SpotAbstract(MCD_SPOT).file(ilk, "mat", MAT);
 
         // poke the spotter to pull in a price
         SpotAbstract(MCD_SPOT).poke(ilk);
