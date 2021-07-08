@@ -7,7 +7,7 @@ import "ds-value/value.sol";
 import "ds-math/math.sol";
 import "ds-test/test.sol";
 import "dss-interfaces/Interfaces.sol";
-import "./ff1-config.sol";
+import "./config.sol";
 import "../test/addresses_kovan.sol";
 import "../test/rates.sol";
 

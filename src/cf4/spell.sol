@@ -7,7 +7,7 @@ import "dss-interfaces/dss/SpotAbstract.sol";
 import "dss-interfaces/dss/GemJoinAbstract.sol";
 import "dss-interfaces/dapp/DSTokenAbstract.sol";
 import "dss-interfaces/dss/ChainlogAbstract.sol";
-import "./cf4-config.sol";
+import "./config.sol";
 
 interface RwaLiquidationLike {
     function wards(address) external returns (uint256);
