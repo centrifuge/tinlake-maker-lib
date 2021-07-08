@@ -25,12 +25,12 @@ contract POOL_CONFIG {
 
 
     // MIP21 contracts RWA005-A
-    address public constant MCD_JOIN = 0x19443a936b99c5c88897aE3eF72d65EcE6a9e4B8;
-    address constant GEM = 0x4bA1b1A2876bF7E740eedA5e43D0310f2DF368A9;
+    address public constant MCD_JOIN = 0x1233d0DBb55A4Bb41D711d4B584f8DDB15A2Ff88;
+    address constant GEM = 0xcB2A48D26970eE7193d66BAc6F1b3090f2E8f82B;
     address public constant OPERATOR = 0x17E5954Cdd3611Dd84e444F0ed555CC3a06cB319; // MGR
     address public constant INPUT_CONDUIT = 0x17E5954Cdd3611Dd84e444F0ed555CC3a06cB319; // MGR
     address public constant OUTPUT_CONDUIT = 0x17E5954Cdd3611Dd84e444F0ed555CC3a06cB319; // MGR
-    address public constant URN =  0x9afcF6d0E31d55Eec4dC379e8504636B1d67BBE2;
+    address public constant URN =  0xdB9f0700EbBac596CCeF5b14D5e23664Db2A184f;
     address public LIQ = 0x2881c5dF65A8D81e38f7636122aFb456514804CC; // MIP21-LIQ-ORACLE
 
     // changelog IDs
