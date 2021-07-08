@@ -105,7 +105,7 @@ contract SpellAction is POOL_CONFIG {
         JugAbstract(MCD_JUG).file(ilk, "duty", RATE);
 
         // Set the CF4DRP-A min collateralization ratio)
-        SpotAbstract(MCD_SPOT).file(ilk, "mat", 100 * RAY / 100);
+        SpotAbstract(MCD_SPOT).file(ilk, "mat", MAT);
 
         // poke the spotter to pull in a price
         SpotAbstract(MCD_SPOT).poke(ilk);
