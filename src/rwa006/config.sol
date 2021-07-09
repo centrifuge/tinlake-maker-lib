@@ -48,4 +48,5 @@ contract POOL_CONFIG {
     uint256 public constant DC = 20 * MILLION * RAD; // creditline: 20 mio
     uint256 public constant MAT = 100 * RAY / 100; // Min Vault CR of 100%
     uint256 public constant INITIAL_PRICE =  20_808_000 * WAD; // creditLine + 2 years of stability fee => 20000000 * 1.02^2
+    uint256 public constant PCT = 200;
 }

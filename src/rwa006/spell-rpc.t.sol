@@ -383,10 +383,10 @@ contract DssSpellTestBase is DSTest, DSMath, POOL_CONFIG {
         afterSpell.collaterals[ilk] = CollateralValues({
             line:         DC / RAD,        // In whole Dai units
             dust:         0,               // In whole Dai units
-            pct:          360,             // In basis points
+            pct:          PCT,             // In basis points
             chop:         0,               // In basis points
             dunk:         0,               // In whole Dai units
-            mat:          10000,           // In basis points
+            mat:          MAT / 10**23,           // In basis points
             beg:          300,             // In basis points
             ttl:          6 hours,         // In seconds
             tau:          6 hours,         // In seconds
