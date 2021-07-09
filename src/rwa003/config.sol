@@ -37,7 +37,7 @@ contract POOL_CONFIG {
     address public LIQ = 0x2881c5dF65A8D81e38f7636122aFb456514804CC; // MIP21-LIQ-ORACLE
 
     // changelog IDs
-    bytes32 public constant dropID = "RWA003";
+    bytes32 public constant gemID = "RWA003";
     bytes32 public constant joinID = "MCD_JOIN_RWA003_A";
     bytes32 public constant urnID = "RWA003_A_URN";
     bytes32 public constant inputConduitID = "RWA003_A_INPUT_CONDUIT";

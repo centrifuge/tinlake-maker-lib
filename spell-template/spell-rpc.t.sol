@@ -260,7 +260,7 @@ contract DssSpellTestBase is DSTest, DSMath, POOL_CONFIG {
 
     ChainlogAbstract          chainlog = ChainlogAbstract(    addr.addr("CHANGELOG"));
 
-    DSTokenAbstract             rwagem = DSTokenAbstract(     addr.addr(dropID));
+    DSTokenAbstract             rwagem = DSTokenAbstract(     addr.addr(gemID));
     GemJoinAbstract            rwajoin = GemJoinAbstract(     addr.addr(joinID));
     RwaLiquidationLike          oracle = RwaLiquidationLike(  addr.addr("MIP21_LIQUIDATION_ORACLE"));
     RwaUrnLike                  rwaurn = RwaUrnLike(          addr.addr(urnID));
@@ -364,7 +364,7 @@ contract DssSpellTestBase is DSTest, DSMath, POOL_CONFIG {
         //
         afterSpell = SystemValues({
             pot_dsr:               0,                     // In basis points
-            vat_Line:              1874678025714652012761622719462012263810031275685188788, // current system values 
+            vat_Line:              1879678025714652012761622719462012263810031275685188788, // current system values 
             pause_delay:           60,                    // In seconds
             vow_wait:              3600,                  // In seconds
             vow_dump:              2,                     // In whole Dai units
@@ -386,7 +386,7 @@ contract DssSpellTestBase is DSTest, DSMath, POOL_CONFIG {
             pct:          PCT,             // In basis points
             chop:         0,               // In basis points
             dunk:         0,               // In whole Dai units
-            mat:          MAT / 10**23,           // In basis points
+            mat:          MAT,              
             beg:          300,             // In basis points
             ttl:          6 hours,         // In seconds
             tau:          6 hours,         // In seconds
@@ -577,7 +577,7 @@ contract DssSpellTestBase is DSTest, DSMath, POOL_CONFIG {
         {
         (,uint256 mat) = spot.ilks(ilk);
         // Convert BP to system expected value
-        uint256 normalizedTestMat = (values.collaterals[ilk].mat * 10**23);
+        uint256 normalizedTestMat = values.collaterals[ilk].mat;
         assertEq(mat, normalizedTestMat);
         assertTrue(mat >= RAY && mat < 10 * RAY);    // cr eq 100% and lt 1000%
         }
@@ -649,7 +649,7 @@ contract DssSpellTest is DssSpellTestBase {
         scheduleWaitAndCast();
         assertTrue(spell.done());
 
-        assertEq(chainlog.getAddress(dropID), addr.addr(dropID));
+        assertEq(chainlog.getAddress(gemID), addr.addr(gemID));
         assertEq(chainlog.getAddress(joinID), addr.addr(joinID));
         assertEq(chainlog.getAddress(urnID), addr.addr(urnID));
         assertEq(chainlog.getAddress(inputConduitID), addr.addr(inputConduitID));

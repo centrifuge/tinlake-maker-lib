@@ -61,7 +61,7 @@ contract SpellAction is POOL_CONFIG {
 
 
         // add addresses to changelog
-        CHANGELOG.setAddress(dropID, DROP);
+        CHANGELOG.setAddress(gemID, GEM);
         CHANGELOG.setAddress(joinID, MCD_JOIN);
         CHANGELOG.setAddress(urnID, URN);
         CHANGELOG.setAddress(inputConduitID, INPUT_CONDUIT);

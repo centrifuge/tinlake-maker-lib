@@ -7,11 +7,10 @@ import "ds-value/value.sol";
 import "ds-math/math.sol";
 import "ds-test/test.sol";
 import "dss-interfaces/Interfaces.sol";
-import "./config.sol";
-import "../test/addresses_kovan.sol";
-import "../test/rates.sol";
+import "./rates.sol";
+import "./addresses_kovan.sol";
 
-import {RwaSpell, SpellAction} from "./spell.sol";
+import {RwaSpell, SpellAction} from "../spell.sol";
 
 interface Hevm {
     function warp(uint256) external;
@@ -76,7 +75,7 @@ contract EndSpellAction {
     }
 }
 
-contract TestSpell is POOL_CONFIG {
+contract TestSpell {
     ChainlogAbstract constant CHANGELOG =
         ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
     DSPauseAbstract public pause =
@@ -120,14 +119,15 @@ contract EndSpell is TestSpell {
     }
 }
 
-contract CullSpellAction is POOL_CONFIG {
+contract CullSpellAction {
     ChainlogAbstract constant CHANGELOG =
         ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
+    bytes32 constant ilk = "NS2DRP-A";
 
     function execute() public {
         RwaLiquidationLike(
             CHANGELOG.getAddress("MIP21_LIQUIDATION_ORACLE")
-        ).cull(ilk, CHANGELOG.getAddress(urnID));
+        ).cull(ilk, CHANGELOG.getAddress("NS2DRP_A_URN"));
     }
 }
 
@@ -138,9 +138,10 @@ contract CullSpell is TestSpell {
     }
 }
 
-contract CureSpellAction is POOL_CONFIG {
+contract CureSpellAction {
     ChainlogAbstract constant CHANGELOG =
         ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
+    bytes32 constant ilk = "NS2DRP-A";
 
     function execute() public {
         RwaLiquidationLike(
@@ -156,9 +157,10 @@ contract CureSpell is TestSpell {
     }
 }
 
-contract TellSpellAction is POOL_CONFIG {
+contract TellSpellAction {
     ChainlogAbstract constant CHANGELOG =
         ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
+    bytes32 constant ilk = "NS2DRP-A";
 
     function execute() public {
         VatAbstract(CHANGELOG.getAddress("MCD_VAT")).file(ilk, "line", 0);
@@ -175,14 +177,16 @@ contract TellSpell is TestSpell {
     }
 }
 
-contract BumpSpellAction is POOL_CONFIG {
+contract BumpSpellAction {
     ChainlogAbstract constant CHANGELOG =
         ChainlogAbstract(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
+    bytes32 constant ilk = "NS2DRP-A";
+    uint256 constant WAD = 10 ** 18;
 
     function execute() public {
         RwaLiquidationLike(
             CHANGELOG.getAddress("MIP21_LIQUIDATION_ORACLE")
-        ).bump(ilk, INITIAL_PRICE * 2);
+        ).bump(ilk, 5466480 * WAD);
     }
 }
 
@@ -193,11 +197,11 @@ contract BumpSpell is TestSpell {
     }
 }
 
-contract DssSpellTestBase is DSTest, DSMath, POOL_CONFIG {
+contract DssSpellTestBase is DSTest, DSMath {
     // populate with mainnet spell if needed
-    address constant KOVAN_SPELL = address(0);
+    address constant KOVAN_SPELL = address(0x94caeCD665391a7718cDD4c9a3933DBFD7EAa0d3);
     // this needs to be updated
-    uint256 SPELL_CREATED;
+    uint256 constant SPELL_CREATED = 1617224004;
 
     struct CollateralValues {
         uint256 line;
@@ -236,7 +240,7 @@ contract DssSpellTestBase is DSTest, DSMath, POOL_CONFIG {
 
     // KOVAN ADDRESSES
     DSPauseAbstract              pause = DSPauseAbstract(     addr.addr("MCD_PAUSE"));
-    address                      pauseProxy =                 addr.addr("MCD_PAUSE_PROXY");
+    address                 pauseProxy =                      addr.addr("MCD_PAUSE_PROXY");
 
     DSChiefAbstract              chief = DSChiefAbstract(     addr.addr("MCD_ADM"));
     VatAbstract                    vat = VatAbstract(         addr.addr("MCD_VAT"));
@@ -260,17 +264,18 @@ contract DssSpellTestBase is DSTest, DSMath, POOL_CONFIG {
 
     ChainlogAbstract          chainlog = ChainlogAbstract(    addr.addr("CHANGELOG"));
 
-    DSTokenAbstract             rwagem = DSTokenAbstract(     addr.addr(gemID));
-    GemJoinAbstract            rwajoin = GemJoinAbstract(     addr.addr(joinID));
+    bytes32 constant ilk               = "NS2DRP-A";
+    DSTokenAbstract             rwagem = DSTokenAbstract(     addr.addr("NS2DRP"));
+    GemJoinAbstract            rwajoin = GemJoinAbstract(     addr.addr("MCD_JOIN_NS2DRP_A"));
     RwaLiquidationLike          oracle = RwaLiquidationLike(  addr.addr("MIP21_LIQUIDATION_ORACLE"));
-    RwaUrnLike                  rwaurn = RwaUrnLike(          addr.addr(urnID));
-    RwaInputConduitLike   rwaconduitin = RwaInputConduitLike( addr.addr(inputConduitID));
-    RwaOutputConduitLike rwaconduitout = RwaOutputConduitLike(addr.addr(outputConduitID));
+    RwaUrnLike                  rwaurn = RwaUrnLike(          addr.addr("NS2DRP_A_URN"));
+    RwaInputConduitLike   rwaconduitin = RwaInputConduitLike( addr.addr("NS2DRP_A_INPUT_CONDUIT"));
+    RwaOutputConduitLike rwaconduitout = RwaOutputConduitLike(addr.addr("NS2DRP_A_OUTPUT_CONDUIT"));
 
     address    makerDeployer06 = 0xda0fab060e6cc7b1C0AA105d29Bd50D71f036711;
 
     // Tinlake
-    TinlakeManagerLike mgr = TinlakeManagerLike(MGR);
+    TinlakeManagerLike mgr = TinlakeManagerLike(0x8905C7066807793bf9c7cd1d236DEF0eE2692B9a);
     address mgr_ = address(mgr);
 
     RwaSpell spell;
@@ -348,11 +353,10 @@ contract DssSpellTestBase is DSTest, DSMath, POOL_CONFIG {
         rates = new Rates();
 
         spell = KOVAN_SPELL != address(0) ?
-        RwaSpell(KOVAN_SPELL) : new RwaSpell();
-        SPELL_CREATED = SPELL_CREATED != 0 ? SPELL_CREATED : block.timestamp; // set time of spell creation
-        // set this contract as ward on mgr
+            RwaSpell(KOVAN_SPELL) : new RwaSpell();
 
-        hevm.store(mgr_, keccak256(abi.encode(self, uint(0))), bytes32(uint(1)));
+        // set this contract as ward on mgr
+        hevm.store(mgr_, keccak256(abi.encode(address(this), uint(0))), bytes32(uint(1)));
         assertEq(mgr.wards(self), 1);
         // setup manager dependencies
         mgr.file("urn", address(rwaurn));
@@ -364,13 +368,13 @@ contract DssSpellTestBase is DSTest, DSMath, POOL_CONFIG {
         //
         afterSpell = SystemValues({
             pot_dsr:               0,                     // In basis points
-            vat_Line:              1879678025714652012761622719462012263810031275685188788, // current system values 
+            vat_Line:              1872022462695350358129361112284276089361426420400424096,// In whole Dai units
             pause_delay:           60,                    // In seconds
             vow_wait:              3600,                  // In seconds
             vow_dump:              2,                     // In whole Dai units
             vow_sump:              50,                    // In whole Dai units
             vow_bump:              10,                    // In whole Dai units
-            vow_hump:              500102513227513227500000000000000000000000000000, // current system values
+            vow_hump:              500,                   // In whole Dai units
             cat_box:               10 * THOUSAND,         // In whole Dai units
             osm_mom_authority:     addr.addr("MCD_ADM"),  // OsmMom authority -> added addr.addr("MCD_ADM")
             flipper_mom_authority: addr.addr("MCD_ADM"),  // FlipperMom authority -> added addr.addr("MCD_ADM")
@@ -380,13 +384,13 @@ contract DssSpellTestBase is DSTest, DSMath, POOL_CONFIG {
         //
         // Test for all collateral based changes here
         //
-        afterSpell.collaterals[ilk] = CollateralValues({
-            line:         DC / RAD,        // In whole Dai units
+        afterSpell.collaterals["NS2DRP-A"] = CollateralValues({
+            line:         5 * MILLION,     // In whole Dai units // 50 million
             dust:         0,               // In whole Dai units
-            pct:          PCT,             // In basis points
+            pct:          360,             // In basis points
             chop:         0,               // In basis points
             dunk:         0,               // In whole Dai units
-            mat:          MAT,              
+            mat:          10000,           // In basis points // 105%
             beg:          300,             // In basis points
             ttl:          6 hours,         // In seconds
             tau:          6 hours,         // In seconds
@@ -442,10 +446,10 @@ contract DssSpellTestBase is DSTest, DSMath, POOL_CONFIG {
     }
 
     function scheduleWaitAndCast() public {
-        emit log_named_uint("blocktime", block.timestamp);
         spell.schedule();
 
         uint256 castTime = block.timestamp + pause.delay();
+
         uint256 day = (castTime / 1 days + 3) % 7;
         if(day >= 5) {
             castTime += 7 days - day * 86400;
@@ -528,7 +532,7 @@ contract DssSpellTestBase is DSTest, DSMath, POOL_CONFIG {
 
         {
         // hump values in RAD
-        uint256 normalizedHump = values.vow_hump;
+        uint256 normalizedHump = values.vow_hump * RAD;
         assertEq(vow.hump(), normalizedHump);
         assertTrue(
             (vow.hump() >= RAD && vow.hump() < HUNDRED * MILLION * RAD) ||
@@ -649,15 +653,15 @@ contract DssSpellTest is DssSpellTestBase {
         scheduleWaitAndCast();
         assertTrue(spell.done());
 
-        assertEq(chainlog.getAddress(gemID), addr.addr(gemID));
-        assertEq(chainlog.getAddress(joinID), addr.addr(joinID));
-        assertEq(chainlog.getAddress(urnID), addr.addr(urnID));
-        assertEq(chainlog.getAddress(inputConduitID), addr.addr(inputConduitID));
-        assertEq(chainlog.getAddress(outputConduitID), addr.addr(outputConduitID));
+        assertEq(chainlog.getAddress("NS2DRP"), addr.addr("NS2DRP"));
+        assertEq(chainlog.getAddress("MCD_JOIN_NS2DRP_A"), addr.addr("MCD_JOIN_NS2DRP_A"));
+        assertEq(chainlog.getAddress("NS2DRP_A_URN"), addr.addr("NS2DRP_A_URN"));
+        assertEq(chainlog.getAddress("NS2DRP_A_INPUT_CONDUIT"), addr.addr("NS2DRP_A_INPUT_CONDUIT"));
+        assertEq(chainlog.getAddress("NS2DRP_A_OUTPUT_CONDUIT"), addr.addr("NS2DRP_A_OUTPUT_CONDUIT"));
         assertEq(chainlog.getAddress("MIP21_LIQUIDATION_ORACLE"), addr.addr("MIP21_LIQUIDATION_ORACLE"));
     }
 
-    function testSpellIsCast_INTEGRATION_BUMP() public {
+    function testSpellIsCast_NS2DRP_INTEGRATION_BUMP() public {
         vote(address(spell));
         scheduleWaitAndCast();
         assertTrue(spell.done());
@@ -669,14 +673,14 @@ contract DssSpellTest is DssSpellTestBase {
 
         uint256 castTime = block.timestamp + pause.delay();
         hevm.warp(castTime);
-        (, address pip, ,) = oracle.ilks(ilk);
+        (, address pip, ,) = oracle.ilks("NS2DRP-A");
 
-        assertEq(DSValueAbstract(pip).read(), bytes32(INITIAL_PRICE));
+        assertEq(DSValueAbstract(pip).read(), bytes32(5_366_480 * WAD));
         bumpSpell.cast();
-        assertEq(DSValueAbstract(pip).read(), bytes32(INITIAL_PRICE * 2));
+        assertEq(DSValueAbstract(pip).read(), bytes32(5_466_480 * WAD));
     }
 
-    function testSpellIsCast_INTEGRATION_TELL() public {
+    function testSpellIsCast_NS2DRP_INTEGRATION_TELL() public {
         vote(address(spell));
         scheduleWaitAndCast();
         assertTrue(spell.done());
@@ -688,18 +692,18 @@ contract DssSpellTest is DssSpellTestBase {
 
         uint256 castTime = block.timestamp + pause.delay();
         hevm.warp(castTime);
-        (, , , uint48 tocPre) = oracle.ilks(ilk);
+        (, , , uint48 tocPre) = oracle.ilks("NS2DRP-A");
         assertTrue(tocPre == 0);
-        assertTrue(oracle.good(ilk));
+        assertTrue(oracle.good("NS2DRP-A"));
         tellSpell.cast();
-        (, , , uint48 tocPost) = oracle.ilks(ilk);
+        (, , , uint48 tocPost) = oracle.ilks("NS2DRP-A");
         assertTrue(tocPost > 0);
-        assertTrue(oracle.good(ilk));
+        assertTrue(oracle.good("NS2DRP-A"));
         hevm.warp(block.timestamp + 600);
-        assertTrue(!oracle.good(ilk));
+        assertTrue(!oracle.good("NS2DRP-A"));
     }
 
-    function testSpellIsCast_INTEGRATION_TELL_CURE_GOOD() public {
+    function testSpellIsCast_NS2DRP_INTEGRATION_TELL_CURE_GOOD() public {
         vote(address(spell));
         scheduleWaitAndCast();
         assertTrue(spell.done());
@@ -728,7 +732,7 @@ contract DssSpellTest is DssSpellTestBase {
         assertEq(uint256(toc), 0);
     }
 
-    function testFailSpellIsCast_INTEGRATION_CURE() public {
+    function testFailSpellIsCast_NS2DRP_INTEGRATION_CURE() public {
         vote(address(spell));
         scheduleWaitAndCast();
         assertTrue(spell.done());
@@ -742,11 +746,11 @@ contract DssSpellTest is DssSpellTestBase {
         cureSpell.cast();
     }
 
-    function testSpellIsCast_INTEGRATION_TELL_CULL() public {
+    function testSpellIsCast_NS2DRP_INTEGRATION_TELL_CULL() public {
         vote(address(spell));
         scheduleWaitAndCast();
         assertTrue(spell.done());
-        assertTrue(oracle.good(ilk));
+        assertTrue(oracle.good("NS2DRP-A"));
 
         tellSpell = new TellSpell();
         vote(address(tellSpell));
@@ -756,9 +760,9 @@ contract DssSpellTest is DssSpellTestBase {
         uint256 castTime = block.timestamp + pause.delay();
         hevm.warp(castTime);
         tellSpell.cast();
-        assertTrue(oracle.good(ilk));
+        assertTrue(oracle.good("NS2DRP-A"));
         hevm.warp(block.timestamp + 600);
-        assertTrue(!oracle.good(ilk));
+        assertTrue(!oracle.good("NS2DRP-A"));
 
         cullSpell = new CullSpell();
         vote(address(cullSpell));
@@ -767,12 +771,12 @@ contract DssSpellTest is DssSpellTestBase {
         castTime = block.timestamp + pause.delay();
         hevm.warp(castTime);
         cullSpell.cast();
-        assertTrue(!oracle.good(ilk));
-        (, address pip,,) = oracle.ilks(ilk);
+        assertTrue(!oracle.good("NS2DRP-A"));
+        (, address pip,,) = oracle.ilks("NS2DRP-A");
         assertEq(DSValueAbstract(pip).read(), bytes32(0));
     }
 
-    function testSpellIsCast_END() public {
+    function testSpellIsCast_NS2DRP_END() public {
         vote(address(spell));
         scheduleWaitAndCast();
         assertTrue(spell.done());
