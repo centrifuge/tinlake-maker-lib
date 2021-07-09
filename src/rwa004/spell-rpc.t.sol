@@ -364,7 +364,7 @@ contract DssSpellTestBase is DSTest, DSMath, POOL_CONFIG {
         //
         afterSpell = SystemValues({
             pot_dsr:               0,                     // In basis points
-            vat_Line:              1879678025714652012761622719462012263810031275685188788, // current system values 
+            vat_Line:              1887678025714652012761622719462012263810031275685188788, // current system values 
             pause_delay:           60,                    // In seconds
             vow_wait:              3600,                  // In seconds
             vow_dump:              2,                     // In whole Dai units
