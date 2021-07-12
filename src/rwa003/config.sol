@@ -34,7 +34,7 @@ contract POOL_CONFIG {
     address public constant INPUT_CONDUIT = 0x45e17E350279a2f28243983053B634897BA03b64; // MGR
     address public constant OUTPUT_CONDUIT = 0x45e17E350279a2f28243983053B634897BA03b64; // MGR
     address public constant URN =  0x993c239179D6858769996bcAb5989ab2DF75913F;
-    address public LIQ = 0x2881c5dF65A8D81e38f7636122aFb456514804CC; // MIP21-LIQ-ORACLE
+    address public constant LIQ = 0x2881c5dF65A8D81e38f7636122aFb456514804CC; // MIP21-LIQ-ORACLE
 
     // changelog IDs
     bytes32 public constant dropID = "RWA003";
