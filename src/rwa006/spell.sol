@@ -83,15 +83,15 @@ contract SpellAction is POOL_CONFIG {
         (,address pip,,) = RwaLiquidationLike(MIP21_LIQUIDATION_ORACLE).ilks(ilk);
         CHANGELOG.setAddress(pipID, pip);
 
-        // Set price feed for CF4DRP
+        // Set price feed for RWA006
         SpotAbstract(MCD_SPOT).file(ilk, "pip", pip);
 
-        // Init CF4DRP in Vat
+        // Init RWA006 in Vat
         VatAbstract(MCD_VAT).init(ilk);
-        // Init CF4DRP in Jug
+        // Init RWA006 in Jug
         JugAbstract(MCD_JUG).init(ilk);
 
-        // Allow CF4DRP Join to modify Vat registry
+        // Allow RWA006 Join to modify Vat registry
         VatAbstract(MCD_VAT).rely(MCD_JOIN);
 
         // 5 Million debt ceiling
@@ -104,7 +104,7 @@ contract SpellAction is POOL_CONFIG {
         // set stability fee
         JugAbstract(MCD_JUG).file(ilk, "duty", RATE);
 
-        // Set the CF4DRP-A min collateralization ratio)
+        // Set the RWA006-A min collateralization ratio)
         SpotAbstract(MCD_SPOT).file(ilk, "mat", MAT);
 
         // poke the spotter to pull in a price
