@@ -14,11 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity 0.6.12;
+pragma solidity 0.5.12;
 
 import "dss-exec-lib/DssExec.sol";
 import "dss-exec-lib/DssAction.sol";
 import "lib/dss-interfaces/src/dss/GemJoinAbstract.sol";
+import "lib/dss-interfaces/src/dss/IlkRegistryAbstract.sol";
 import "lib/dss-interfaces/src/dapp/DSTokenAbstract.sol";
 
 interface Initializable {
@@ -108,7 +109,7 @@ contract DssSpellAction is DssAction {
         uint256 PRICE;
         uint256 MAT;
         uint256 TAU;
-        string memory DOC;
+        bytes32 DOC;
     }
 
     CentrifugeCollateralValues public constant RWA003 = CentrifugeCollateralValues({
@@ -119,7 +120,7 @@ contract DssSpellAction is DssAction {
             MEMBERLIST: 0xb7ee04cb62bFD87862e56E2E880b9EeB87aDf20F,
             COORDINATOR: 0xb9575aD050263cC0A9E65B8bd6041DbF5e02bf1F, 
             SENIOR_OPERATOR: 0xDeb6eEEF90bbb5be6A771250eb9bA8d0804c3F5D,
-            TRANCHE: 0x3bCe1712d1AaC8C9597Bc65F1c1630aF32F918B0,
+            TRANCHE: 0x3bCe1712d1AaC8C9597Bc65F1c1630aF32F918B0
         }),
         mip21Addresses: MIP21Addresses({
             MCD_JOIN: 0x4CCc7fED3912A32B6Cf7Db2FdA1554a9FF574099,
@@ -128,7 +129,7 @@ contract DssSpellAction is DssAction {
             INPUT_CONDUIT: 0x45e17E350279a2f28243983053B634897BA03b64,
             OUTPUT_CONDUIT: 0x45e17E350279a2f28243983053B634897BA03b64,
             URN:  0x993c239179D6858769996bcAb5989ab2DF75913F,
-            LIQ: 0x2881c5dF65A8D81e38f7636122aFb456514804CC,
+            LIQ: 0x2881c5dF65A8D81e38f7636122aFb456514804CC
         }),
         changelogIDs: ChangelogIDs({
             gemID: "RWA003",
@@ -144,7 +145,7 @@ contract DssSpellAction is DssAction {
         CEIL: 2 * MILLION,
         PRICE: 2_247_200 * WAD,
         MAT: 10_500,
-        TAU: 0;
+        TAU: 0,
         DOC: ""
     });
     // CentrifugeCollateralValues public constant RWA004;
@@ -154,7 +155,7 @@ contract DssSpellAction is DssAction {
     // Maker changelog 
     address public constant MAKER_CHANGELOG = 0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F;
 
-    function actions() public override {
+    function actions() public {
         integrateCentrifugeCollateral(RWA003);
         // integrateCentrifugeCollateral(RWA004);
         // integrateCentrifugeCollateral(RWA005);
@@ -248,8 +249,8 @@ contract DssSpellAction is DssAction {
             3,
             pip,
             address(0),
-            "RWA003-A: Centrifuge: ConsolFreight",
-            collateral.ilk"
+            collateral.ilkRegistryName,
+            collateral.ilk
         );
     }
 }
